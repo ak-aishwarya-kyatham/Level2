@@ -1,29 +1,152 @@
-# NewsIntel AI – Multi-Agent Enterprise Platform
+# NewsIntel AI – Multi-Agent Enterprise News Intelligence Platform
 
-NewsIntel AI is a robust, multi-agent enterprise platform for aggregating, analyzing, and questioning news from various top-tier sources.
+NewsIntel AI is a robust, multi-agent enterprise platform for aggregating, analyzing, and questioning real-time news from various top-tier media outlets. Powered by a **Model Context Protocol (MCP)** server-client architecture and orchestrated using **LangGraph**, it enables semantic news retrieval, comparison, and dynamic summarization with local LLM integration.
 
-## Architecture Diagram
+---
 
-1. **Ingestion Pipeline (Background)**:
-   APScheduler -> News Scraper -> Cleaner -> Categorizer (facebook/bart-large-mnli) -> Chunker -> Embedder (BAAI/bge-m3) -> Duplicate Detector -> MongoDB / Qdrant
-2. **User Request Pipeline (LangGraph)**:
-   User Query -> FastAPI -> Auth & Cache -> Triage Agent -> [Compare/Summary/Search/Trend] -> Retrieval Agent -> Ollama (Qwen) -> Response
+## 🏗️ Architecture & How It Works
 
-## Services
-- **Backend**: FastAPI
-- **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
-- **Database**: MongoDB (Metadata), Qdrant (Vectors), Redis (Caching)
-- **AI Models**: Ollama (Qwen), HuggingFace (BART, BGE-M3)
+The platform operates through two main pipeline flows:
 
-## Setup Guide
-1. Ensure Docker and Docker Compose are installed.
-2. Clone this repository.
-3. Run `docker-compose up --build`
-4. The frontend will be available at `http://localhost:5173`
-5. The backend will be available at `http://localhost:8000`
+### 1. Ingestion & Enrichment Pipeline (Background Worker)
+A background scheduler periodically polls RSS feeds from multiple media outlets, cleanses the articles, categorizes them, and indexes them into database repositories.
 
-## Database Schema
-Refer to `backend/app/schemas/news.py` for the NewsArticle model representation.
+```mermaid
+graph TD
+    A[APScheduler] -->|Every 5 Mins| B[News Scraper & RSS Ingestor]
+    B --> C[Cleaning Agent]
+    C --> D[Categorizer Agent]
+    D --> E[Duplicate Detector Agent]
+    E -->|Write Metadata| F[(MongoDB / JSON Store)]
+    E -->|Generate Embeddings| G[(Qdrant Vector Index)]
+```
 
-## Agent Workflow Documentation
-Refer to `backend/app/workflows/main_workflow.py` for the LangGraph routing logic.
+### 2. User Query & RAG Pipeline (LangGraph Orchestration)
+User queries are triaged and routed through a specialized multi-agent workflow to retrieve context and synthesize the final answer.
+
+```mermaid
+graph TD
+    UserQuery[User Prompt / Search] --> API[FastAPI Server]
+    API --> CacheCheck{Redis Cache Hit?}
+    CacheCheck -->|Yes| Return[Cached Response]
+    CacheCheck -->|No| Triage[Triage Agent]
+    
+    Triage -->|Route Search| Search[Search Agent]
+    Triage -->|Route Compare| Compare[Compare Agent]
+    Triage -->|Route Summary| Summarize[Summary Agent]
+    Triage -->|Route Trend| Trend[Trend Agent]
+    
+    Search & Compare & Summarize & Trend --> Retrieval[Retrieval Agent]
+    Retrieval -->|MCP Client Query| MCPServer[MCP Server Tools]
+    MCPServer -->|Load Context| ResponseAgent[Response Gen Agent]
+    
+    ResponseAgent -->|Local LLM| Ollama[Ollama Server: Qwen2.5]
+    ResponseAgent -->|LLM Unavailable| Synthesizer[Built-in Extractive Synthesizer]
+    Ollama & Synthesizer --> FinalAnswer[Final Markdown Response]
+```
+
+---
+
+## 🛠️ Technology Stack
+
+* **Backend API**: FastAPI, Python 3.11, Uvicorn
+* **Frontend UI**: React, TypeScript, Vite, Tailwind CSS, Lucide Icons
+* **Multi-Agent Orchestration**: LangGraph, LangChain
+* **AI & Embedding Models**: Ollama (Qwen2.5 local model), HuggingFace (Transformers)
+* **API Protocol Layer**: Model Context Protocol (MCP) Server & Client (via `mcp` SDK)
+* **Databases (Multi-Tier)**:
+  * **MongoDB** (Stored article metadata)
+  * **Qdrant** (Vector store for search embeddings)
+  * **Redis** (Caching responses)
+  * **Disk File System** (JSON store fallback for lightweight standalone mode)
+
+---
+
+## 🚀 Standalone Local Setup Guide (Without Docker)
+
+You can run the entire frontend and backend directly on your host machine. The backend automatically falls back to in-memory/JSON disk-store modes if MongoDB, Redis, or Qdrant are not running locally.
+
+### Prerequisites
+* **Node.js** (v20 or higher)
+* **Python** (v3.11 or higher)
+* **Ollama** (Running locally with `qwen2.5:3b` pulled: `ollama run qwen2.5:3b`)
+
+### 1. Set Up and Run the Backend
+1. Open a terminal and navigate to the backend folder:
+   ```bash
+   cd backend
+   ```
+2. Create and activate a Python virtual environment:
+   ```bash
+   # Windows
+   python -m venv venv
+   .\venv\Scripts\activate
+
+   # Linux/macOS
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Start the backend FastAPI server:
+   ```bash
+   python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+   ```
+   *The backend will be live at `http://127.0.0.1:8000`.*
+
+### 2. Set Up and Run the Frontend
+1. Open a new terminal and navigate to the frontend folder:
+   ```bash
+   cd frontend
+   ```
+2. Install npm dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the Vite development server:
+   ```bash
+   npm run dev
+   ```
+   *The frontend will be live at `http://localhost:5173`.*
+
+---
+
+## 🐳 Docker Compose Setup Guide (Complete Containerization)
+
+If you want to run the entire stack (including MongoDB, Redis, Qdrant, Ollama, backend, and frontend) inside Docker:
+
+### Prerequisites
+* **Docker Desktop** installed and running on your machine.
+
+### Run Command
+In the root directory of the project (where `docker-compose.yml` is located), run:
+```bash
+docker-compose up --build
+```
+
+### Access Ports
+* **Frontend UI**: `http://localhost:5173`
+* **FastAPI Backend**: `http://localhost:8000`
+* **Qdrant Vector Database**: `http://localhost:6333`
+* **MongoDB**: `http://localhost:27017`
+* **Redis**: `http://localhost:6379`
+* **Ollama API**: `http://localhost:11434`
+
+---
+
+## 🤖 MCP Server Primitives (Available Tools & Resources)
+
+The backend implements the Model Context Protocol (MCP) server that exposes the following:
+
+### Registered Tools
+* `search_live_news`: Search indexed live news articles or retrieve dynamically.
+* `fetch_latest_rss_feeds`: Manually trigger live news ingestion.
+* `get_dashboard_analytics`: Retrieve platform metrics and trending topics.
+* `compare_news_sources`: Compare coverage between two media outlets.
+* `get_articles_by_category`: Retrieve articles matching a specific category.
+
+### Exposed Resources
+* `news://store/articles`: Retrieve all active stored news articles.
+* `news://analytics/metrics`: Access platform analytics and entity distribution metrics.
