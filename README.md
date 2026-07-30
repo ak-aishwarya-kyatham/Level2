@@ -111,28 +111,6 @@ You can run the entire frontend and backend directly on your host machine. The b
    ```
    *The frontend will be live at `http://localhost:5173`.*
 
----
-
-## 🐳 Docker Compose Setup Guide (Complete Containerization)
-
-If you want to run the entire stack (including MongoDB, Redis, Qdrant, Ollama, backend, and frontend) inside Docker:
-
-### Prerequisites
-* **Docker Desktop** installed and running on your machine.
-
-### Run Command
-In the root directory of the project (where `docker-compose.yml` is located), run:
-```bash
-docker-compose up --build
-```
-
-### Access Ports
-* **Frontend UI**: `http://localhost:5173`
-* **FastAPI Backend**: `http://localhost:8000`
-* **Qdrant Vector Database**: `http://localhost:6333`
-* **MongoDB**: `http://localhost:27017`
-* **Redis**: `http://localhost:6379`
-* **Ollama API**: `http://localhost:11434`
 
 ---
 
