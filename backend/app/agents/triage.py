@@ -13,10 +13,10 @@ def triage_agent(state: AgentState) -> AgentState:
     # Basic keyword-based intent extraction (Can be replaced with LLM call)
     if "compare" in query or "vs" in query:
         state["intent"] = "compare"
-    elif "summarize" in query or "summary" in query:
-        state["intent"] = "summarize"
     elif "trend" in query or "trending" in query:
         state["intent"] = "trend"
+    elif "summarize" in query or "summary" in query:
+        state["intent"] = "summarize"
     else:
         state["intent"] = "search"
         

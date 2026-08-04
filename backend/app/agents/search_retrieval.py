@@ -17,6 +17,28 @@ async def retrieval_agent(state: AgentState) -> AgentState:
     logger.info("Retrieval Agent fetching live context via MCP Server...")
     query = state.get("query", "")
     
+    # Check if this is a request for trending news
+    if state.get("intent") == "trend":
+        logger.info("Fetching top trending articles from dashboard analytics...")
+        try:
+            stats = await mcp_client.call_tool("get_dashboard_analytics")
+            if isinstance(stats, dict) and "trending_topics" in stats:
+                trending_topics = stats["trending_topics"]
+                retrieved_docs = []
+                for topic in trending_topics[:5]:
+                    retrieved_docs.append({
+                        "title": topic.get("topic", "Trending News Topic"),
+                        "content": topic.get("description", "No description available."),
+                        "source": topic.get("category", "Trending News"),
+                        "url": topic.get("url", "#"),
+                        "published_date": ""
+                    })
+                state["retrieved_documents"] = retrieved_docs
+                logger.info(f"Retrieved {len(retrieved_docs)} trending articles.")
+                return state
+        except Exception as e:
+            logger.error(f"Error fetching trending topics: {e}")
+            
     # Detect if user provided text directly to be summarized
     import re
     user_provided_text = ""
