@@ -6,4 +6,6 @@ client = TestClient(app)
 def test_read_main():
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "message": "NewsIntel AI Backend is running"}
+    res_json = response.json()
+    assert res_json["status"] == "ok"
+    assert "NewsIntel AI MCP Live Intelligence Backend" in res_json["message"]

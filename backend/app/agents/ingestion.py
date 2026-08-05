@@ -91,7 +91,7 @@ class NewsIngestionAgent:
         Dynamically fetches live articles from Google News RSS for any custom user search query.
         """
         encoded_query = urllib.parse.quote(query)
-        feed_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+        feed_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-IN&gl=IN&ceid=IN:en"
         logger.info(f"Fetching dynamic news for query '{query}' from: {feed_url}")
 
         articles = []

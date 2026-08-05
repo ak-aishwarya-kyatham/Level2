@@ -8,31 +8,40 @@ logger = logging.getLogger(__name__)
 class CleaningAgent:
     """
     Removes advertisements, HTML tags, scripts, extra spaces, empty paragraphs, and Unicode issues.
+    Ensures HTML list items and block elements are separated with proper sentence boundaries.
     """
     def __init__(self):
         pass
 
     def clean_html(self, text: str) -> str:
-        # Use BeautifulSoup to remove HTML tags and scripts
+        if not text:
+            return ""
+            
         soup = BeautifulSoup(text, "html.parser")
         
-        # Remove script and style elements
-        for script in soup(["script", "style"]):
-            script.decompose()
+        # Remove script, style, and font attribution elements that pollute Google News RSS summaries
+        for tag in soup(["script", "style", "font"]):
+            tag.decompose()
             
-        return soup.get_text()
+        # Add period-space separators to block tags (p, li, div, br) so get_text() produces distinct sentences
+        for block_tag in soup.find_all(["p", "li", "div", "br", "h1", "h2", "h3"]):
+            block_tag.insert_after(". ")
+
+        raw_text = soup.get_text(separator=" ")
+        return raw_text
 
     def clean_text(self, text: str) -> str:
-        # Remove HTML
+        # Remove HTML structure
         text = self.clean_html(text)
         
-        # Remove extra whitespaces and empty lines
+        # Remove repeated periods or double spaces caused by block element separation
+        text = re.sub(r'\.\s*\.', '.', text)
         text = re.sub(r'\s+', ' ', text)
         
-        # Remove unicode issues/non-ascii if necessary, though retaining it for Telugu is important
-        # Let's keep it basic but robust
-        text = text.strip()
+        # Remove trailing publisher attributions like "- Engadget", "- TechCrunch", "- BBC"
+        text = re.sub(r'\s*[\-\|]\s*(?:Engadget|TechCrunch|Android Police|PPC Land|CoinDesk|Yahoo Finance|CNBC|Barron\'s|Investor\'s Business Daily|BBC|CNN|Reuters|AP News|NDTV News|The Hindu|Indian Express)\b.*?(?=\.|$)', '', text, flags=re.IGNORECASE)
         
+        text = text.strip()
         return text
 
     async def run(self, article: NewsArticleBase) -> str:

@@ -5,7 +5,7 @@ import axios from "axios";
 // In prod: set VITE_API_BASE_URL=https://your-api-domain.com in .env.production
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000",
-  timeout: 15000,
+  timeout: 90000,
   headers: {
     "Content-Type": "application/json",
   },

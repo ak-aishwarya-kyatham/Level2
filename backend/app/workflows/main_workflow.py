@@ -4,6 +4,7 @@ from app.workflows.langgraph_state import AgentState
 
 # Agent nodes
 from app.agents.triage import triage_agent
+from app.agents.query_understanding import query_understanding_agent
 from app.agents.search_retrieval import search_agent, retrieval_agent
 from app.agents.specialized import summary_agent, compare_agent, trend_agent, translation_agent
 from app.agents.response import response_generation_agent
@@ -43,6 +44,7 @@ graph = StateGraph(AgentState)
 graph.add_node("cache", cache_agent)
 graph.add_node("triage", triage_agent)
 graph.add_node("search", search_agent)
+graph.add_node("query_understanding", query_understanding_agent)
 graph.add_node("retrieval", retrieval_agent)
 graph.add_node("summary", summary_agent)
 graph.add_node("compare", compare_agent)
@@ -60,13 +62,13 @@ graph.add_conditional_edges("triage", route_triage, {
     "search": "search"
 })
 
-# All specialized nodes eventually might need retrieval or go straight to response.
-# For simplicity, search goes to retrieval. Compare/Summary/Trend can also go to retrieval if needed.
-graph.add_edge("search", "retrieval")
-graph.add_edge("compare", "retrieval")
-graph.add_edge("summary", "retrieval")
-graph.add_edge("trend", "retrieval")
+# All specialized nodes route to query_understanding, which then routes to retrieval.
+graph.add_edge("search", "query_understanding")
+graph.add_edge("compare", "query_understanding")
+graph.add_edge("summary", "query_understanding")
+graph.add_edge("trend", "query_understanding")
 
+graph.add_edge("query_understanding", "retrieval")
 graph.add_edge("retrieval", "response")
 graph.add_edge("translation", "response") # Optional translation step
 graph.add_edge("response", END)

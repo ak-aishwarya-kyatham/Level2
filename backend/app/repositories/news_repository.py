@@ -252,8 +252,14 @@ class NewsRepository:
             if len(matched) >= 8:
                 return matched[:limit]
 
-            term_to_fetch = query.strip()
-            logger.info(f"Fetching live Google News RSS articles for '{term_to_fetch}'...")
+            # Clean conversational filler for live Google News RSS query
+            clean_term = query.strip()
+            clean_term = re.sub(r"(?i)^(what is|what are|tell me about|tell me more about|give me|show me|latest news about|latest news on|latest news in|search for|find news about)\s+", "", clean_term)
+            clean_term = re.sub(r"(?i)^(summarize|summarise|summary of|updates on|updates about|news about|news on)\s+", "", clean_term)
+            clean_term = re.sub(r"(?i)\s+(give me|please|today|latest|now)$", "", clean_term).strip()
+            term_to_fetch = clean_term or query.strip()
+            
+            logger.info(f"Fetching live Google News RSS articles for '{term_to_fetch}' (raw query: '{query}')...")
             try:
                 live_items = await self.ingestion_agent.fetch_dynamic_topic_news(term_to_fetch, limit=15)
                 if live_items:

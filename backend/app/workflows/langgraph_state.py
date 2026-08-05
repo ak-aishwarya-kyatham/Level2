@@ -12,3 +12,10 @@ class AgentState(TypedDict):
     specialized_output: str
     final_response: str
     error: str
+    extracted_topic: str
+    extracted_entities: List[str]
+    expanded_query: str
+    target_category: str
+    target_url: str
+    requested_limit: int
+

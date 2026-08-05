@@ -1,11 +1,14 @@
 import logging
+import requests
 from typing import List
 
 logger = logging.getLogger(__name__)
 
+OLLAMA_URL = "http://localhost:11434"
+
 class EmbeddingAgent:
     """
-    Generates embeddings using BAAI/bge-m3 with lazy model loading.
+    Generates embeddings using BAAI/bge-m3 via local Ollama or lazy transformer fallback.
     """
     def __init__(self):
         self.model_name = "BAAI/bge-m3"
@@ -29,6 +32,21 @@ class EmbeddingAgent:
             self.model = None
 
     async def run(self, text: str) -> List[float]:
+        # Try Ollama bge-m3 first
+        try:
+            r = requests.post(
+                f"{OLLAMA_URL}/api/embeddings",
+                json={"model": "bge-m3:latest", "prompt": text},
+                timeout=5
+            )
+            if r.status_code == 200:
+                emb = r.json().get("embedding", [])
+                if emb:
+                    return emb
+        except Exception as e:
+            logger.debug(f"Ollama embedding lookup skipped/failed: {e}")
+
+        # Local fallback
         self._lazy_load()
         if not self.model or not self.tokenizer:
             logger.warning("Embedding model not loaded. Returning empty embedding vector.")
