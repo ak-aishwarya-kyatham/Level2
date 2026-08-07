@@ -286,6 +286,12 @@ class NewsRepository:
                     content = (a.get("content") or "").lower()
                     cat = (a.get("category") or "").lower()
                     
+                    # Domain Purity Guard: Exclude non-business titles (entertainment/movies/sports) when searching Economics/Finance
+                    query_lower = query.lower()
+                    if any(k in query_lower for k in ["economic", "economy", "market", "finance", "stock", "business", "forex", "yen", "fed"]):
+                        if cat in ["entertainment", "sports"] or any(ent in title for ent in ["movie", "film", "box office", "actor", "actress", "avatar", "ramayana", "rrr", "bollywood", "hollywood", "cricket"]):
+                            continue
+
                     pattern = rf'\b{re.escape(t)}\b'
                     if re.search(pattern, title) or re.search(pattern, cat) or re.search(pattern, content):
                         matched.append(a)
