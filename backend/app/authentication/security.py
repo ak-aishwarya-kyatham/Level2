@@ -7,7 +7,11 @@ import os
 PWD_CONTEXT = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Configuration could be moved to settings.py
-SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
+import secrets
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    # Use dynamically generated key on startup to avoid hardcoded defaults
+    SECRET_KEY = secrets.token_hex(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 8  # 8 days
 

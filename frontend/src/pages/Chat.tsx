@@ -14,6 +14,7 @@ interface Message {
 export default function Chat() {
   const location = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasHandledPrefill = useRef<string | null>(null);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -26,13 +27,15 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Check if navigate state passed a prefill or query prompt
+  // Check if navigate state passed a prefill or query prompt (prevent double execution)
   useEffect(() => {
     if (location.state) {
       const stateObj = location.state as any;
       const prefillMsg = stateObj.prefill || stateObj.query;
-      if (prefillMsg) {
-        setInput(prefillMsg);
+      if (prefillMsg && hasHandledPrefill.current !== prefillMsg) {
+        hasHandledPrefill.current = prefillMsg;
+        window.history.replaceState({}, document.title);
+        setInput("");
         handleSend(undefined, prefillMsg);
       }
     }
@@ -74,7 +77,11 @@ export default function Chat() {
         {
           role: "assistant",
           content:
-            "⚠️ Unable to connect to the backend server. Please verify the backend FastAPI process is running on http://localhost:8000.",
+            error?.code === "ECONNABORTED"
+              ? "⏳ The request timed out. The AI is processing your query — please try again."
+              : error?.response
+                ? `⚠️ Server error: ${error.response.status} — ${error.response.data?.detail || 'Unknown error'}`
+                : "⚠️ Unable to connect to the backend server. Please verify the backend FastAPI process is running on http://localhost:8000.",
         },
       ]);
     } finally {

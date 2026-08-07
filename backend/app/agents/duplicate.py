@@ -31,7 +31,7 @@ class DuplicateDetectionAgent:
         return float(np.dot(v1, v2) / (norm1 * norm2))
 
     def get_ollama_embedding(self, text: str) -> List[float]:
-        """Fetch text embeddings using Ollama bge-m3 model."""
+        """Fetch text embeddings using Ollama bge-m3 model with local fallback."""
         if not text or not text.strip():
             return []
         try:
@@ -41,9 +41,19 @@ class DuplicateDetectionAgent:
                 timeout=5
             )
             if r.status_code == 200:
-                return r.json().get("embedding", [])
+                emb = r.json().get("embedding", [])
+                if emb:
+                    return emb
         except Exception as e:
             logger.warning(f"Ollama embedding lookup failed: {e}")
+            
+        try:
+            from app.agents.embedding import EmbeddingAgent
+            if not hasattr(self, "_fallback_agent"):
+                self._fallback_agent = EmbeddingAgent()
+            return self._fallback_agent.get_embedding_sync(text)
+        except Exception as fallback_err:
+            logger.error(f"Fallback embedding failed: {fallback_err}")
         return []
 
     def extract_named_entities(self, text: str) -> Set[str]:

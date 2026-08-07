@@ -31,7 +31,11 @@ def run_all_tests():
             func_name = func.__name__
             try:
                 # Call test function
-                func()
+                import asyncio
+                if asyncio.iscoroutinefunction(func):
+                    asyncio.run(func())
+                else:
+                    func()
                 print(f"  [PASS] {func_name}")
                 passed_tests += 1
             except AssertionError as e:

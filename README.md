@@ -21,28 +21,27 @@ graph TD
     E -->|Generate Embeddings| G[(Qdrant Vector Index)]
 ```
 
-### 2. User Query & RAG Pipeline (LangGraph Orchestration)
-User queries are triaged and routed through a specialized multi-agent workflow to retrieve context and synthesize the final answer.
+### 2. User Query & RAG Pipeline (L2 LangGraph Agentic Loop)
+User queries are processed through an iterative Decide → Act → Observe loop guided by a Policy Agent, validated by a Reflection Agent, and benchmarked by real-time evaluation metrics.
 
 ```mermaid
 graph TD
     UserQuery[User Prompt / Search] --> API[FastAPI Server]
     API --> CacheCheck{Redis Cache Hit?}
     CacheCheck -->|Yes| Return[Cached Response]
-    CacheCheck -->|No| Triage[Triage Agent]
+    CacheCheck -->|No| PolicyAgent[Policy Agent LLM]
     
-    Triage -->|Route Search| Search[Search Agent]
-    Triage -->|Route Compare| Compare[Compare Agent]
-    Triage -->|Route Summary| Summarize[Summary Agent]
-    Triage -->|Route Trend| Trend[Trend Agent]
+    PolicyAgent --> DecideNextAction{Choose Next Action}
+    DecideNextAction -->|Tool Call| ToolNode[Execute MCP Tool]
+    ToolNode --> Observation[Receive Observation]
+    Observation --> AppendHistory[Append History to State]
+    AppendHistory --> PolicyAgent
     
-    Search & Compare & Summarize & Trend --> Retrieval[Retrieval Agent]
-    Retrieval -->|MCP Client Query| MCPServer[MCP Server Tools]
-    MCPServer -->|Load Context| ResponseAgent[Response Gen Agent]
+    DecideNextAction -->|Finish| ReflectionAgent[Reflection Agent LLM]
     
-    ResponseAgent -->|Local LLM| Ollama[Ollama Server: Qwen2.5]
-    ResponseAgent -->|LLM Unavailable| Synthesizer[Built-in Extractive Synthesizer]
-    Ollama & Synthesizer --> FinalAnswer[Final Markdown Response]
+    ReflectionAgent --> CheckReflection{Should Revise?}
+    CheckReflection -->|Yes| PolicyAgent
+    CheckReflection -->|No| FinalResponse[Return Final Response]
 ```
 
 ---

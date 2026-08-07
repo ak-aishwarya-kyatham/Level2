@@ -23,6 +23,7 @@ async def periodic_news_fetcher():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing NewsIntel AI MCP Server & Client architecture...")
+    await mcp_client.start()
     tools = await mcp_client.list_available_tools()
     logger.info(f"Registered MCP Tools: {tools}")
     
@@ -31,6 +32,8 @@ async def lifespan(app: FastAPI):
     # Start continuous background fetcher
     asyncio.create_task(periodic_news_fetcher())
     yield
+    await mcp_client.stop()
+
 
 app = FastAPI(
     title="NewsIntel AI - Multi-Agent Enterprise Platform (MCP Architecture)",
@@ -62,21 +65,15 @@ app.include_router(compare.router)
 app.include_router(sources.router)
 
 @app.get("/")
-
 async def read_root():
-    return {
-        "status": "ok", 
-        "architecture": "Model Context Protocol (MCP)",
-        "message": "NewsIntel AI MCP Live Intelligence Backend is active",
-        "live_articles_count": len(news_repository.articles),
-        "available_mcp_tools": [
-            "search_live_news",
-            "fetch_latest_rss_feeds",
-            "get_dashboard_analytics",
-            "compare_news_sources"
-        ],
-        "available_mcp_resources": [
-            "news://store/articles",
-            "news://analytics/metrics"
-        ]
-    }
+    return {"status": "ok", "architecture": "Model Context Protocol (MCP)", "message": "NewsIntel AI MCP Live Intelligence Backend is active", "live_articles_count": len(news_repository.articles), "available_mcp_tools": ["search_live_news", "fetch_latest_rss_feeds", "get_dashboard_analytics", "compare_news_sources"], "available_mcp_resources": ["news://store/articles", "news://analytics/metrics"]}
+
+@app.get("/api/health")
+async def health():
+    """Simple health check endpoint"""
+    return {"status": "healthy"}
+
+@app.get("/ping")
+async def ping():
+    """Simple ping endpoint for debugging"""
+    return {"ping": "pong"}

@@ -23,7 +23,9 @@ def triage_agent(state: AgentState) -> AgentState:
         state["requested_limit"] = 10
 
     # Keyword-based intent extraction
-    if "compare" in query or " vs " in query:
+    if "summarize" in query or "summary" in query or "briefing" in query:
+        state["intent"] = "summarize"
+    elif "compare" in query or " vs " in query:
         state["intent"] = "compare"
     elif re.search(r'\b(?:tr[ee]nd(?:ing|nign)?|trnd|top topics?|topics? of)\b', query):
         state["intent"] = "trend"
@@ -32,8 +34,6 @@ def triage_agent(state: AgentState) -> AgentState:
          (re.search(r'\b(?:top|first)\s*\d+\b', query) and not any(k in query for k in ["about", "on ", "for "])) or \
          (("latest" in query or "live" in query or "top" in query) and ("feed" in query or "dashboard" in query or "news" in query) and not any(k in query for k in ["about", "on ", "for "])):
         state["intent"] = "live_feed"
-    elif "summarize" in query or "summary" in query:
-        state["intent"] = "summarize"
     else:
         state["intent"] = "search"
         

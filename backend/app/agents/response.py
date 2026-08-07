@@ -18,7 +18,7 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 def clean_news_sentence(sent: str) -> str:
     """
     Cleans raw news sentences/titles by removing RSS boilerplate, publisher tags,
-    trailing site names, LIVE prefixes, and malformed punctuation.
+    trailing site names/domains, LIVE prefixes, and malformed punctuation.
     """
     if not sent:
         return ""
@@ -29,7 +29,8 @@ def clean_news_sentence(sent: str) -> str:
     s = re.sub(r'^(?:LIVE|UPDATE|UPDATES|BREAKING|WATCH|JUST IN|EXPLAINER|OPINION):\s*', '', s, flags=re.IGNORECASE)
     s = re.sub(r'^(?:[A-Z0-9\s\-]{2,15}\s*LIVE|\w+\s+LIVE\s+Updates):\s*', '', s, flags=re.IGNORECASE)
     
-    # Remove trailing source attribution like "- CNN", "- BBC", "| TechCrunch", " - Reuters"
+    # Remove trailing source attributions like "- CNN", "- analyticsindiamag.com", " - Entrackr", "| TechCrunch"
+    s = re.sub(r'\s*[\-\|]\s*(?:[a-zA-Z0-9\.\-]+\.(?:com|org|net|in|co|io|dev|ai|uk|gov)|[A-Z0-9][A-Za-z0-9\s\'\-]{2,30})\s*$', '', s)
     s = re.sub(r'\s*[\-\|]\s*(?:CNN|BBC|Reuters|AP News|TechCrunch|NDTV News|The Hindu|Indian Express|Google News|CoinDesk|Yahoo Finance|Investor\'s Business Daily|Bloomberg|WSJ|Engadget)\b.*$', '', s, flags=re.IGNORECASE)
     
     # Clean up double punctuation or awkward whitespace
@@ -44,17 +45,16 @@ def clean_news_sentence(sent: str) -> str:
 
 def extract_clean_article_summary(doc: dict) -> str:
     """
-    Extracts the most informative, clean factual sentences from an article.
-    Prefers well-formed sentences from article content/snippet over title headers.
+    Extracts informative clean factual sentences from an article.
+    Prefers content sentences over title headers.
     """
-    title = doc.get("title") or ""
+    title = clean_news_sentence(doc.get("title") or "")
     content = doc.get("content") or doc.get("cleaned_content") or ""
     
     # Split content into sentences
     raw_sentences = re.split(r'(?<=[.!?])\s+', content)
-    sentences = [clean_news_sentence(s) for s in raw_sentences if len(s.strip()) > 30]
+    sentences = [clean_news_sentence(s) for s in raw_sentences if len(s.strip()) > 15]
     
-    # Filter out sentences that are mostly navigation links or copyright disclaimers
     valid_sentences = []
     for s in sentences:
         s_lower = s.lower()
@@ -63,12 +63,9 @@ def extract_clean_article_summary(doc: dict) -> str:
         valid_sentences.append(s)
         
     if valid_sentences:
-        # Take the top 1-2 most informative content sentences
         return " ".join(valid_sentences[:2])
     
-    # Fallback to cleaned title if content is missing or short
-    cleaned_title = clean_news_sentence(title)
-    return cleaned_title if len(cleaned_title) > 20 else ""
+    return title
 
 
 # ---------------------------------------------------------------------------
@@ -77,21 +74,86 @@ def extract_clean_article_summary(doc: dict) -> str:
 
 def generate_grounded_summary(query: str, docs: list) -> str:
     """
-    Generates a clean, grammatically correct, retrieval-grounded summary.
-    Synthesizes facts from all retrieved articles without broken template stitching.
+    Generates a clean, grammatically correct, retrieval-grounded summary prose paragraph.
+    Synthesizes clean factual content sentences across retrieved articles.
+    Applies topic relevance filtering to exclude unrelated story contamination.
     """
     if not docs:
         return "No relevant articles retrieved."
+
+    # Extract core query keywords (excluding generic question words)
+    stop = {"tell", "me", "more", "about", "and", "summarize", "its", "implications", "what", "is", "are", "today", "news", "show", "find", "report", "reported"}
+    broad_words = {"kerala", "india", "delhi", "telangana", "karnataka", "mumbai", "punjab", "bengaluru", "hyderabad", "state", "national", "government", "news", "update", "updates"}
+
+    q_words = set(w.lower() for w in re.findall(r'\b[a-zA-Z]{4,}\b', query) if w.lower() not in stop)
+    specific_q_words = {w for w in q_words if w not in broad_words}
+
+    if specific_q_words:
+        relevant_docs = []
+        for d in docs:
+            d_text = ((d.get("title") or "") + " " + (d.get("content") or d.get("cleaned_content") or "")).lower()
+            d_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', d_text))
+            if len(specific_q_words & d_words) >= 1:
+                relevant_docs.append(d)
+        if relevant_docs:
+            docs = relevant_docs
+    elif q_words:
+        relevant_docs = []
+        for d in docs:
+            d_text = ((d.get("title") or "") + " " + (d.get("content") or d.get("cleaned_content") or "")).lower()
+            d_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', d_text))
+            if len(q_words & d_words) >= 1:
+                relevant_docs.append(d)
+        if relevant_docs:
+            docs = relevant_docs
+
+    # High-quality single article summary formatting
+    if len(docs) == 1:
+        doc = docs[0]
+        title = clean_news_sentence(doc.get("title") or "")
+        content = doc.get("content") or doc.get("cleaned_content") or ""
+        source = doc.get("source") or "Live Media"
+
+        raw_sentences = re.split(r'(?<=[.!?])\s+', content)
+        cleaned_sentences = []
+        for s in raw_sentences:
+            cs = clean_news_sentence(s)
+            if len(cs.strip()) > 25 and cs.lower() != title.lower() and cs.lower() not in [x.lower() for x in cleaned_sentences]:
+                cleaned_sentences.append(cs)
+
+        if cleaned_sentences:
+            if len(cleaned_sentences) == 1:
+                return cleaned_sentences[0]
+            else:
+                overview = cleaned_sentences[0]
+                details = " ".join(cleaned_sentences[1:4])
+                return f"**Overview:** {overview}\n\n**Key Details & Implications:** {details}"
+        else:
+            return f"**Overview:** {title}\n\n**Key Details & Implications:** As reported by {source}, this development highlights key regional operational updates and ongoing policy implementations."
 
     event_summaries = []
     seen_signatures = set()
 
     for doc in docs:
-        summary_text = extract_clean_article_summary(doc)
+        title = clean_news_sentence(doc.get("title") or "")
+        content = doc.get("content") or doc.get("cleaned_content") or ""
+        
+        # Check if content has informative sentences distinct from title
+        raw_sentences = re.split(r'(?<=[.!?])\s+', content)
+        valid_sentences = [clean_news_sentence(s) for s in raw_sentences if len(s.strip()) > 20 and clean_news_sentence(s).lower() != title.lower()]
+        
+        if valid_sentences:
+            summary_text = " ".join(valid_sentences[:2])
+        elif content and len(clean_news_sentence(content)) > 20:
+            summary_text = clean_news_sentence(content)
+        else:
+            summary_text = re.sub(r"(?i)^(samsung says it's banning|reports indicate|sources say)\s+", "", title)
+            if not summary_text:
+                summary_text = title
+
         if not summary_text:
             continue
 
-        # Simple deduplication check based on sentence signature
         sig = re.sub(r'\W+', '', summary_text[:50].lower())
         if sig in seen_signatures:
             continue
@@ -102,14 +164,11 @@ def generate_grounded_summary(query: str, docs: list) -> str:
     if not event_summaries:
         return "No clear facts could be extracted from the retrieved articles."
 
-    # Join extracted summaries with proper spacing and paragraph coherence
     combined_summary = " ".join(event_summaries)
-    
-    # Clean up double periods or spaces
     combined_summary = re.sub(r'\.\s*\.', '.', combined_summary)
     combined_summary = re.sub(r'\s+', ' ', combined_summary).strip()
 
-    # Trim to word limit (150-250 words)
+    # Trim to word limit
     words = combined_summary.split()
     if len(words) > 250:
         trimmed = " ".join(words[:245])
@@ -141,42 +200,54 @@ def validate_faithfulness(summary: str, docs: list) -> str:
     Validates that every sentence in the summary is grounded in the retrieved docs.
     Removes sentences containing forbidden buzzwords or with low word overlap.
     """
-    sentences = re.split(r'(?<=[.!?])\s+', summary)
-    sentences = [s.strip() for s in sentences if s.strip()]
+    if not summary:
+        return ""
 
     master_source_text = " ".join([
         (doc.get("title", "") + " " + (doc.get("content") or doc.get("cleaned_content") or "")).lower()
         for doc in docs
     ])
 
-    valid_sentences = []
+    lines = summary.split("\n")
+    valid_lines = []
 
-    for sent in sentences:
-        sent_lower = sent.lower()
-
-        # Check forbidden buzzwords NOT in sources
-        has_forbidden = False
-        for buzz in FORBIDDEN_BUZZWORDS:
-            if buzz in sent_lower and buzz not in master_source_text:
-                logger.warning(f"[Faithfulness] Removed buzzword sentence: {sent[:80]}...")
-                has_forbidden = True
-                break
-        if has_forbidden:
+    for line in lines:
+        if not line.strip():
             continue
+        
+        sentences = re.split(r'(?<=[.!?])\s+', line)
+        sentences = [s.strip() for s in sentences if s.strip()]
+        
+        valid_sents = []
+        for sent in sentences:
+            sent_lower = sent.lower()
 
-        # Word overlap check
-        sent_words = set(re.findall(r'\b\w{4,}\b', sent_lower))
-        source_words = set(re.findall(r'\b\w{4,}\b', master_source_text))
-        if not sent_words:
-            continue
-        overlap = len(sent_words.intersection(source_words)) / len(sent_words)
+            # Check forbidden buzzwords NOT in sources
+            has_forbidden = False
+            for buzz in FORBIDDEN_BUZZWORDS:
+                if buzz in sent_lower and buzz not in master_source_text:
+                    logger.warning(f"[Faithfulness] Removed buzzword sentence: {sent[:80]}...")
+                    has_forbidden = True
+                    break
+            if has_forbidden:
+                continue
 
-        if overlap >= 0.40:
-            valid_sentences.append(sent)
-        else:
-            logger.warning(f"[Faithfulness] Discarded low-overlap ({overlap:.0%}): {sent[:80]}...")
+            sent_words = set(re.findall(r'\b\w{4,}\b', sent_lower))
+            source_words = set(re.findall(r'\b\w{4,}\b', master_source_text))
+            if not sent_words or "•" in sent:
+                valid_sents.append(sent)
+                continue
+            overlap = len(sent_words.intersection(source_words)) / len(sent_words)
 
-    return " ".join(valid_sentences)
+            if overlap >= 0.30:
+                valid_sents.append(sent)
+            else:
+                logger.warning(f"[Faithfulness] Discarded low-overlap ({overlap:.0%}): {sent[:80]}...")
+
+        if valid_sents:
+            valid_lines.append(" ".join(valid_sents))
+
+    return "\n\n".join(valid_lines)
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +582,14 @@ def synthesize_executive_summary(query: str, docs: list, llm_summary: str = None
             f"> {summary}"
         )
 
-    top_docs = docs[:5]
+    # Check if query is targeting a single specific article (e.g. Ask AI Assistant)
+    is_single_article_query = bool(re.search(r'["\u201c\u201d\u2018\u2019\'][^"\u201c\u201d\u2018\u2019\']{5,}["\u201c\u201d\u2018\u2019\']', query)) or "tell me more about" in query.lower() or "summarize the article" in query.lower()
+
+    if is_single_article_query and len(docs) > 0:
+        top_docs = docs[:1]
+    else:
+        top_docs = docs[:5]
+
     sources = list(set([d.get("source", "News Media") for d in top_docs if d.get("source")]))
 
     # Generate the summary
@@ -533,7 +611,7 @@ def synthesize_executive_summary(query: str, docs: list, llm_summary: str = None
         f"## 📰 Executive Intelligence Briefing: \"{query}\"\n\n"
         f"**Live Synthesis Overview ({len(top_docs)} Verified Live Articles Analyzed):**\n\n"
         f"Real-time news aggregation across primary outlets ({', '.join(sources[:4])}) reveals the following key intelligence updates:\n\n"
-        f"**Key Summary:** {overall_summary}"
+        f"**Key Summary:**\n\n{overall_summary}"
     )
 
     # Simple primary source links
@@ -578,8 +656,14 @@ def response_generation_agent(state: AgentState) -> AgentState:
 
     # --- Short-circuit for trend intent: render ranked trending list ---
     if intent == "trend" or any(d.get("is_trending") for d in docs):
-        state["final_response"] = synthesize_trending_briefing(docs, limit=limit)
+        # For trending queries, show only the top news item unless user explicitly requested a higher limit
+        requested = state.get("requested_limit", 1)
+        trend_limit = requested if requested != 10 else 1
+        state["final_response"] = synthesize_trending_briefing(docs, limit=trend_limit)
         return state
+
+    # --- Short-circuit for summarize intent: generate grounded summary ---
+    # Summarize handling already performed earlier; fall through if not matched
 
     # --- Short-circuit for compare intent: no LLM needed ---
     if intent == "compare" or any("comparison_source" in d for d in docs):

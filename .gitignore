@@ -32,3 +32,8 @@ backend/app/data/articles_store.json
 .DS_Store
 Thumbs.db
 .gemini/
+
+# Temporary test scripts
+backend/test_*.py
+backend/test_*.txt
+backend/scratch/

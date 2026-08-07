@@ -63,3 +63,35 @@ class EmbeddingAgent:
         except Exception as e:
             logger.error(f"Embedding error: {e}")
             return []
+
+    def get_embedding_sync(self, text: str) -> List[float]:
+        """Synchronous version of embedding generation for fallback purposes."""
+        # Try Ollama bge-m3 first
+        try:
+            r = requests.post(
+                f"{OLLAMA_URL}/api/embeddings",
+                json={"model": "bge-m3:latest", "prompt": text},
+                timeout=5
+            )
+            if r.status_code == 200:
+                emb = r.json().get("embedding", [])
+                if emb:
+                    return emb
+        except Exception as e:
+            logger.debug(f"Ollama sync embedding lookup failed: {e}")
+
+        self._lazy_load()
+        if not self.model or not self.tokenizer:
+            return []
+        try:
+            import torch
+            encoded_input = self.tokenizer([text], padding=True, truncation=True, return_tensors='pt', max_length=512)
+            with torch.no_grad():
+                model_output = self.model(**encoded_input)
+            sentence_embeddings = model_output[0][:, 0]
+            sentence_embeddings = torch.nn.functional.normalize(sentence_embeddings, p=2, dim=1)
+            return sentence_embeddings[0].tolist()
+        except Exception as e:
+            logger.error(f"Sync embedding error: {e}")
+            return []
+

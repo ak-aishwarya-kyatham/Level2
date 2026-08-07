@@ -13,7 +13,7 @@ mcp_server = FastMCP(
 @mcp_server.tool()
 async def search_live_news(query: str = "", category: str = "", source: str = "", limit: int = 20) -> List[Dict[str, Any]]:
     """
-    MCP Tool: Search indexed live news articles or dynamically retrieve real-time topic news.
+    MCP Tool: Search indexed live news articles, location trends, or topic news (e.g. Telangana, India, Artificial Intelligence). MUST be used for all topic, state, or location queries.
     """
     logger.info(f"[MCP Tool: search_live_news] Query: '{query}', Category: '{category}', Source: '{source}'")
     return await news_repository.search_articles(query=query, category=category, source=source, limit=limit)
@@ -34,7 +34,7 @@ async def fetch_latest_rss_feeds() -> Dict[str, Any]:
 @mcp_server.tool()
 async def get_dashboard_analytics() -> Dict[str, Any]:
     """
-    MCP Tool: Retrieve dashboard statistics, metrics, and trending news topics.
+    MCP Tool: Retrieve overall global system statistics and high-level platform analytics. DO NOT use for location, state, or specific topic queries.
     """
     logger.info("[MCP Tool: get_dashboard_analytics] Retrieving stats...")
     return news_repository.get_dashboard_stats()
@@ -68,4 +68,9 @@ def get_analytics_resource() -> Dict[str, Any]:
     MCP Resource: Access platform analytics and source distribution metrics.
     """
     return news_repository.get_analytics_metrics()
+
+
+if __name__ == "__main__":
+    mcp_server.run(transport="stdio")
+
 
