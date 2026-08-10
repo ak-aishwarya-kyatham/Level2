@@ -32,6 +32,11 @@ class AgentState(TypedDict):
     action_thought: str
     action_tool: str
     action_arguments: Dict[str, Any]
+    
+    # Real Telemetry & Evaluation States
+    start_time: float
+    cache_hit: bool
+
 
 
 

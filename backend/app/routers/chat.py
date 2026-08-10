@@ -37,8 +37,11 @@ async def chat_endpoint(request: ChatRequest):
         iteration_count=0,
         reflection_report={},
         agent_trace=[],
-        evaluation_metrics={}
+        evaluation_metrics={},
+        start_time=time.perf_counter(),
+        cache_hit=False
     )
+
     
     try:
         # Run the LangGraph workflow

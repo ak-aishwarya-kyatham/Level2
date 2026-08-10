@@ -46,6 +46,7 @@ CACHE_KEY_PREFIX  = "newsintel:query:"
 # ---------------------------------------------------------------------------
 _cache_hits   = 0
 _cache_misses = 0
+_fallback_memory_cache = {}
 
 
 def get_cache_hit_rate() -> float:
@@ -61,9 +62,10 @@ def get_cache_hit_rate() -> float:
 
 def reset_cache_counters():
     """Reset hit/miss counters. Useful for testing."""
-    global _cache_hits, _cache_misses
+    global _cache_hits, _cache_misses, _fallback_memory_cache
     _cache_hits   = 0
     _cache_misses = 0
+    _fallback_memory_cache.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -156,11 +158,16 @@ def cache_get(query: str):
         None -- cache miss or Redis unavailable
     """
     global _cache_hits, _cache_misses
+    key = generate_cache_key(query)
     client = _get_redis_client()
     if client is None:
+        if key in _fallback_memory_cache:
+            _cache_hits += 1
+            logger.info(f"[Cache Memory Fallback] HIT for key: {key[:40]}...")
+            return _fallback_memory_cache[key]
         _cache_misses += 1
         return None
-    key = generate_cache_key(query)
+
     try:
         value = client.get(key)
         if value:
@@ -168,10 +175,16 @@ def cache_get(query: str):
             logger.info(f"[Cache] HIT for key: {key[:40]}...")
             return value
         else:
+            if key in _fallback_memory_cache:
+                _cache_hits += 1
+                return _fallback_memory_cache[key]
             _cache_misses += 1
             logger.info(f"[Cache] MISS for key: {key[:40]}...")
             return None
     except Exception as e:
+        if key in _fallback_memory_cache:
+            _cache_hits += 1
+            return _fallback_memory_cache[key]
         _cache_misses += 1
         logger.warning(f"[Cache] Redis GET failed ({e}). Treating as cache miss.")
         return None
@@ -189,15 +202,25 @@ def cache_set(query: str, response: str, ttl: int = None) -> bool:
     Returns:
         True if stored successfully, False otherwise.
     """
-    client = _get_redis_client()
-    if client is None:
-        return False
     if not response or not response.strip():
         return False
     key = generate_cache_key(query)
+    _fallback_memory_cache[key] = response
+
+    client = _get_redis_client()
+    if client is None:
+        return False
+
+
     effective_ttl = ttl if ttl is not None else CACHE_TTL_SECONDS
     try:
         client.setex(key, effective_ttl, response)
+        logger.info(f"[Cache] SET successful for key: {key[:40]}... (TTL: {effective_ttl}s)")
+        return True
+    except Exception as e:
+        logger.warning(f"[Cache] Redis SET failed ({e}).")
+        return True
+
         logger.info(f"[Cache] SET key: {key[:40]}... (TTL={effective_ttl}s)")
         return True
     except Exception as e:

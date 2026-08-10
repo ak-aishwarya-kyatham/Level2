@@ -4,6 +4,8 @@ import json
 import os
 import asyncio
 from typing import List, Dict, Any, Optional
+from app.utils.redis_cache import get_cache_hit_rate
+
 
 # ---------------------------------------------------------------------------
 # Ground Truth Routing Dataset
@@ -282,19 +284,30 @@ def evaluate_execution(
     retrieved_docs: List[Dict[str, Any]],
     observations: List[Dict[str, Any]],
     intent: str,
-    start_time: float,
-    cache_hit: bool,
+    start_time: Optional[float] = None,
+    cache_hit: bool = False,
+    latency: Optional[float] = None,
     category_predictions: List[str] = None
 ) -> Dict[str, Any]:
     """
     Calculate real performance and retrieval metrics for the agent execution.
     No mock constants — all values are calculated from actual data.
 
-    Routing Accuracy: Dataset-driven, no keyword inference (Fix 2).
-    Categorization F1: Evaluated against CategorizationAgent on labeled dataset (Fix 3a).
-    Deduplication Recall: Evaluated against DuplicateDetectionAgent on labeled dataset (Fix 3b).
+    Routing Accuracy: Dataset-driven, no keyword inference.
+    Categorization F1: Evaluated against CategorizationAgent on labeled dataset.
+    Deduplication Recall: Evaluated against DuplicateDetectionAgent on labeled dataset.
     """
-    latency = time.time() - start_time
+    if latency is not None:
+        calc_latency = float(latency)
+    elif start_time is not None:
+        if start_time > 1000000000:  # Epoch timestamp from time.time()
+            calc_latency = time.time() - start_time
+        else:  # High-precision timer from time.perf_counter()
+            calc_latency = time.perf_counter() - start_time
+    else:
+        calc_latency = 0.0
+
+    calc_latency = max(0.0, calc_latency)
 
     # 1. Precision@5 and MRR@10 based on document keyword overlap with query
     query_tokens = set(tokenize(query))
@@ -354,8 +367,6 @@ def evaluate_execution(
     answer_relevance = calculate_overlap_ratio(query, response)
 
     # 5. Categorization F1 — computed from actual CategorizationAgent on eval dataset
-    # If category_predictions are provided for this specific execution, use them;
-    # otherwise compute from the labeled evaluation dataset.
     if category_predictions and retrieved_docs:
         matching_categories = sum(1 for doc in retrieved_docs if doc.get("category", "").lower() in category_predictions)
         categorization_f1 = round(matching_categories / len(retrieved_docs), 4)
@@ -376,7 +387,9 @@ def evaluate_execution(
         "answer_relevance": round(answer_relevance, 2),
         "categorization_f1": round(categorization_f1, 2),
         "deduplication_recall": round(deduplication_recall, 2),
-        "latency_seconds": round(latency, 2),
-        "cache_hit_rate": 1.0 if cache_hit else 0.0
+        "latency_seconds": round(calc_latency, 4),
+        "cache_hit": bool(cache_hit),
+        "cache_hit_rate": get_cache_hit_rate()
     }
+
 

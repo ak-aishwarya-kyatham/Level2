@@ -37,6 +37,9 @@ async def cache_node(state: AgentState) -> AgentState:
     state["action_tool"] = state.get("action_tool", "")
     state["action_arguments"] = state.get("action_arguments", {})
 
+    if "start_time" not in state or state["start_time"] is None or state["start_time"] == 0:
+        state["start_time"] = time.perf_counter()
+
     # Real Redis cache lookup — replaces mock cache miss
     query = state.get("query", "")
     cached = cache_get(query)
@@ -44,9 +47,24 @@ async def cache_node(state: AgentState) -> AgentState:
         logger.info("[Workflow] Cache HIT — returning cached response, skipping agentic workflow.")
         state["cached_response"] = cached
         state["final_response"] = cached
+        state["cache_hit"] = True
+        latency = time.perf_counter() - state["start_time"]
+        metrics = evaluate_execution(
+            query=query,
+            response=cached,
+            retrieved_docs=[],
+            observations=[],
+            intent=state.get("intent", "search"),
+            latency=latency,
+            cache_hit=True
+        )
+        metrics["cache_hit_rate"] = get_cache_hit_rate()
+        state["evaluation_metrics"] = metrics
         return state
     else:
         state["cached_response"] = ""  # Cache miss — proceed to agentic workflow
+        state["cache_hit"] = False
+
 
     # Run triage and query understanding
     from app.agents.triage import triage_agent
@@ -408,20 +426,30 @@ async def reflection_node(state: AgentState) -> AgentState:
         if resp_str and query:
             cache_set(query, resp_str)
 
-        # Evaluate actual metrics — pass real cache_hit_rate from counters
+        start_t = state.get("start_time")
+        if start_t:
+            if start_t > 1000000000:
+                calc_latency = time.time() - start_t
+            else:
+                calc_latency = time.perf_counter() - start_t
+        else:
+            calc_latency = 0.0
+
+        # Evaluate actual metrics — pass real latency and cache_hit state
         metrics = evaluate_execution(
             query=query,
             response=resp_str,
             retrieved_docs=state.get("retrieved_documents", []),
             observations=history,
             intent=state.get("intent", "search"),
-            start_time=time.time() - 2.0,  # approximate duration
-            cache_hit=False
+            latency=calc_latency,
+            cache_hit=state.get("cache_hit", False)
         )
         # Override cache_hit_rate with actual dynamic value from Redis counters
         metrics["cache_hit_rate"] = get_cache_hit_rate()
         state["evaluation_metrics"] = metrics
         state["agent_trace"].append("Reflection complete. Finalizing response.")
+
 
     return state
 
