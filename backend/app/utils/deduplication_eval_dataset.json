@@ -1,0 +1,42 @@
+[
+  {
+    "article_a": "OpenAI releases a new AI model called GPT-5",
+    "article_b": "OpenAI launches its latest artificial intelligence model GPT-5",
+    "is_duplicate": true
+  },
+  {
+    "article_a": "Apple launches a new iPhone 17 with AI chip",
+    "article_b": "India wins an international cricket match against Australia",
+    "is_duplicate": false
+  },
+  {
+    "article_a": "NVIDIA unveils next generation GPU for AI workloads",
+    "article_b": "NVIDIA announces new graphics processor for artificial intelligence computing",
+    "is_duplicate": true
+  },
+  {
+    "article_a": "Stock markets fall sharply after inflation data released",
+    "article_b": "Global equity markets decline following higher than expected inflation report",
+    "is_duplicate": true
+  },
+  {
+    "article_a": "Ronaldo scores hat trick in Champions League final",
+    "article_b": "Tesla announces record electric vehicle sales for the quarter",
+    "is_duplicate": false
+  },
+  {
+    "article_a": "India GDP grows at 7 percent in the latest quarter",
+    "article_b": "Rain and thunderstorms expected across several Indian states this week",
+    "is_duplicate": false
+  },
+  {
+    "article_a": "Google DeepMind releases new protein folding research paper",
+    "article_b": "DeepMind publishes groundbreaking study on protein structure prediction",
+    "is_duplicate": true
+  },
+  {
+    "article_a": "Federal Reserve raises interest rates by 25 basis points",
+    "article_b": "US central bank hikes rates by quarter percentage point to curb inflation",
+    "is_duplicate": true
+  }
+]

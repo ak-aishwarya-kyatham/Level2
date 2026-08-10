@@ -24,9 +24,10 @@ class CategorizationAgent:
                     return True
         return False
 
-    async def run(self, content: str) -> str:
+    def _categorize_sync(self, content: str) -> str:
+        """Synchronous version of run() for use in evaluation contexts.
+        Identical logic to run() but does not require an event loop."""
         text_lower = content.lower()
-        
         if self._matches_keywords(text_lower, ["tech", "technology", "artificial intelligence", "ai", "software", "apple", "google", "meta", "nvidia", "cybersecurity", "cyber", "semiconductor", "gadgets", "smartphone"]):
             return "Technology"
         elif self._matches_keywords(text_lower, ["climate", "environment", "pollution", "solar", "renewable", "carbon", "emissions", "green energy", "nature"]):
@@ -45,5 +46,8 @@ class CategorizationAgent:
             return "World"
         else:
             return "General News"
+
+    async def run(self, content: str) -> str:
+        return self._categorize_sync(content)
 
 

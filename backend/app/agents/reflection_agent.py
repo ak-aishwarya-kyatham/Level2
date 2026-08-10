@@ -97,8 +97,9 @@ class ReflectionAgent:
                         "temperature": 0.0
                     }
                 },
-                timeout=10
+                timeout=3
             )
+
             if response.status_code == 200:
                 raw_text = response.json().get("response", "").strip()
                 cleaned_text = self._sanitize_json_string(raw_text)

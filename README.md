@@ -127,3 +127,26 @@ The backend implements the Model Context Protocol (MCP) server that exposes the 
 ### Exposed Resources
 * `news://store/articles`: Retrieve all active stored news articles.
 * `news://analytics/metrics`: Access platform analytics and entity distribution metrics.
+
+---
+
+## ⚡ Core Implementations & Benchmarks
+
+The platform incorporates 4 key architectural features:
+
+1. **Genuine Multi-Step Agentic Loop (`main_workflow.py`):**
+   - Implements an iterative `Decide → Act → Observe → Reflect` LangGraph state machine.
+   - Allows up to `MAX_ITERATIONS = 5` sequential tool invocations (e.g. `search_live_news` followed by `get_dashboard_analytics`) before finalizing responses.
+
+2. **Ground-Truth Routing Accuracy Evaluation (`evaluator.py` & `routing_dataset.json`):**
+   - Replaced naive keyword matching with a ground-truth benchmark dataset (`routing_dataset.json`).
+   - Evaluates LLM policy routing decisions against 10 explicit `{query, expected_tool}` pairs.
+
+3. **Dynamic Evaluation Metrics Engine (`evaluator.py`):**
+   - Replaced all hardcoded metric sentinels (`categorization_f1 = 0.85`, `deduplication_recall = 1.0`).
+   - Measures real-time macro/micro F1 categorization performance on [`categorization_eval_dataset.json`](file:///c:/Users/AishwaryaK/Desktop/agent/backend/app/utils/categorization_eval_dataset.json) and deduplication recall on [`deduplication_eval_dataset.json`](file:///c:/Users/AishwaryaK/Desktop/agent/backend/app/utils/deduplication_eval_dataset.json).
+
+4. **Production-Grade Redis Caching (`redis_cache.py`):**
+   - Integrates SHA-256 query digest hashing (`newsintel:query:<sha256>`) with configurable TTL (`CACHE_TTL_SECONDS`).
+   - Tracks dynamic hit/miss metrics in real time with fast offline connection fallbacks (`socket_connect_timeout=0.2s`).
+

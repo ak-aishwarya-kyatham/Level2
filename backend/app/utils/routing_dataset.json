@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Compare BBC and NDTV coverage of AI",
+    "expected_tool": "compare_news_sources"
+  },
+  {
+    "query": "Find the latest AI news",
+    "expected_tool": "search_live_news"
+  },
+  {
+    "query": "Show the current news analytics",
+    "expected_tool": "get_dashboard_analytics"
+  },
+  {
+    "query": "What are the trending topics this week?",
+    "expected_tool": "search_live_news"
+  },
+  {
+    "query": "Compare Times of India and BBC coverage of Ukraine",
+    "expected_tool": "compare_news_sources"
+  },
+  {
+    "query": "Get me recent news about the Indian economy",
+    "expected_tool": "search_live_news"
+  },
+  {
+    "query": "Show dashboard statistics for today",
+    "expected_tool": "get_dashboard_analytics"
+  },
+  {
+    "query": "How does Economic Times compare to Hindu on budget coverage?",
+    "expected_tool": "compare_news_sources"
+  },
+  {
+    "query": "Summarize top tech news today",
+    "expected_tool": "search_live_news"
+  },
+  {
+    "query": "What are the top news categories right now?",
+    "expected_tool": "get_dashboard_analytics"
+  }
+]

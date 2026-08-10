@@ -244,7 +244,11 @@ class NewsRepository:
         matched = []
         if query and query.strip():
             # Exact title match targeting for quoted article queries (e.g. Ask AI Assistant)
-            quoted = re.findall(r'["\u201c\u201d\u2018\u2019\']([^"\u201c\u201d\u2018\u2019\']+)["\u201c\u201d\u2018\u2019\']', query)
+            # Prioritize outer double-quoted string (full article title) over nested single quotes like '100%'
+            quoted = re.findall(r'["\u201c\u201d]([^"\u201c\u201d]+)["\u201c\u201d]', query)
+            if not quoted:
+                quoted = re.findall(r'["\u201c\u201d\u2018\u2019\']([^"\u201c\u201d\u2018\u2019\']+)["\u201c\u201d\u2018\u2019\']', query)
+
             if quoted:
                 for q in quoted:
                     q_clean = q.strip().lower()
@@ -260,7 +264,7 @@ class NewsRepository:
                             logger.info(f"[Search] Found exact title substring match for: '{q}'. Returning 1 targeted article.")
                             return [a]
                         
-                        # High word-token overlap scoring for minor variations/punctuation
+                        # High word-token overlap scoring for minor variations/punctuation/quotes
                         t_words = set(re.findall(r'\b[a-zA-Z0-9]{3,}\b', t_lower))
                         if q_words and t_words:
                             overlap = len(q_words & t_words) / float(len(q_words))
@@ -268,7 +272,7 @@ class NewsRepository:
                                 best_score = overlap
                                 best_match = a
                     
-                    if best_match and best_score >= 0.45:
+                    if best_match and best_score >= 0.35:
                         logger.info(f"[Search] Found high token overlap match ({best_score:.2f}) for: '{q}'. Returning 1 targeted article.")
                         return [best_match]
 

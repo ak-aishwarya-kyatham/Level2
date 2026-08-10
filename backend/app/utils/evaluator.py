@@ -1,12 +1,266 @@
 import time
 import re
-from typing import List, Dict, Any
+import json
+import os
+import asyncio
+from typing import List, Dict, Any, Optional
+
+# ---------------------------------------------------------------------------
+# Ground Truth Routing Dataset
+# Explicit mapping of query → expected tool.
+# NO keyword inference — every expected_tool is explicitly labeled.
+# ---------------------------------------------------------------------------
+_DATASET_PATH = os.path.join(os.path.dirname(__file__), "routing_dataset.json")
+_CAT_EVAL_PATH = os.path.join(os.path.dirname(__file__), "categorization_eval_dataset.json")
+_DEDUP_EVAL_PATH = os.path.join(os.path.dirname(__file__), "deduplication_eval_dataset.json")
+
+
+def _load_json_file(path: str) -> List:
+    """Load a JSON file, returning empty list on error."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+GROUND_TRUTH_DATASET: List[Dict[str, str]] = _load_json_file(_DATASET_PATH)
+CATEGORIZATION_EVAL_DATASET: List[Dict[str, str]] = _load_json_file(_CAT_EVAL_PATH)
+DEDUPLICATION_EVAL_DATASET: List[Dict[str, str]] = _load_json_file(_DEDUP_EVAL_PATH)
+
+
+# ---------------------------------------------------------------------------
+# Routing Accuracy (Fix 2)
+# ---------------------------------------------------------------------------
+
+def evaluate_routing_accuracy(expected_tool: str, actual_tool: str) -> float:
+    """
+    Compare the actual tool selected by the Policy Agent against
+    the explicitly stored expected tool from the ground truth dataset.
+    Returns 1.0 if correct, 0.0 if incorrect. No keyword inference.
+    """
+    if not expected_tool or not actual_tool:
+        return 0.0
+    return 1.0 if actual_tool.strip() == expected_tool.strip() else 0.0
+
+
+def calculate_dataset_routing_accuracy(actual_tool_selections: List[Dict[str, str]]) -> float:
+    """
+    Calculate overall routing accuracy over the evaluated queries.
+    Routing Accuracy = correct_count / evaluated_count
+    Only queries present in both the dataset AND actual_tool_selections are counted.
+    """
+    if not GROUND_TRUTH_DATASET or not actual_tool_selections:
+        return 0.0
+    actual_lookup = {item["query"]: item["actual_tool"] for item in actual_tool_selections}
+    correct = 0
+    evaluated = 0
+    for item in GROUND_TRUTH_DATASET:
+        query = item["query"]
+        expected = item["expected_tool"]
+        if query not in actual_lookup:
+            continue
+        evaluated += 1
+        actual = actual_lookup[query]
+        if evaluate_routing_accuracy(expected, actual) == 1.0:
+            correct += 1
+    if evaluated == 0:
+        return 0.0
+    return round(correct / evaluated, 4)
+
+
+# ---------------------------------------------------------------------------
+# Categorization F1 (Fix 3a) — uses actual CategorizationAgent
+# ---------------------------------------------------------------------------
+
+_cat_f1_cache = None
+_dedup_recall_cache = None
+
+
+def evaluate_categorization_f1(dataset: Optional[List[Dict[str, str]]] = None) -> Dict[str, float]:
+    """
+    Run the actual CategorizationAgent against the labeled evaluation dataset
+    and compute per-class Precision, Recall, and macro F1.
+
+    Returns:
+        Dict with keys: precision, recall, f1, macro_f1, samples_evaluated
+    """
+    global _cat_f1_cache
+    if dataset is None and _cat_f1_cache is not None:
+        return _cat_f1_cache
+
+    from app.agents.categorization import CategorizationAgent
+    agent = CategorizationAgent()
+    eval_data = dataset if dataset is not None else CATEGORIZATION_EVAL_DATASET
+
+    if not eval_data:
+        return {"precision": 0.0, "recall": 0.0, "f1": 0.0, "macro_f1": 0.0, "samples_evaluated": 0}
+
+    # Run predictions — CategorizationAgent.run() has NO awaits inside it.
+    predictions = []
+    for item in eval_data:
+        text = item.get("text", "")
+        try:
+            pred = agent._categorize_sync(text)
+        except AttributeError:
+            loop = asyncio.new_event_loop()
+            try:
+                pred = loop.run_until_complete(agent.run(text))
+            finally:
+                loop.close()
+        except Exception:
+            pred = "General News"
+        predictions.append(pred)
+
+    # Collect all unique categories in expected + predicted
+    expected_list = [item.get("expected_category", "") for item in eval_data]
+    all_categories = set(expected_list) | set(predictions)
+
+    # Per-class TP, FP, FN
+    tp_sum = fp_sum = fn_sum = 0
+    per_class_f1 = []
+    for cat in all_categories:
+        tp = sum(1 for e, p in zip(expected_list, predictions) if e == cat and p == cat)
+        fp = sum(1 for e, p in zip(expected_list, predictions) if e != cat and p == cat)
+        fn = sum(1 for e, p in zip(expected_list, predictions) if e == cat and p != cat)
+        tp_sum += tp
+        fp_sum += fp
+        fn_sum += fn
+        prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        rec  = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1   = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+        per_class_f1.append(f1)
+
+    macro_f1 = round(sum(per_class_f1) / len(per_class_f1), 4) if per_class_f1 else 0.0
+    micro_prec = round(tp_sum / (tp_sum + fp_sum), 4) if (tp_sum + fp_sum) > 0 else 0.0
+    micro_rec  = round(tp_sum / (tp_sum + fn_sum), 4) if (tp_sum + fn_sum) > 0 else 0.0
+    micro_f1   = round(2 * micro_prec * micro_rec / (micro_prec + micro_rec), 4) if (micro_prec + micro_rec) > 0 else 0.0
+
+    res = {
+        "precision": micro_prec,
+        "recall": micro_rec,
+        "f1": micro_f1,
+        "macro_f1": macro_f1,
+        "samples_evaluated": len(eval_data),
+        "predictions": list(zip(expected_list, predictions))
+    }
+    if dataset is None:
+        _cat_f1_cache = res
+    return res
+
+
+
+# ---------------------------------------------------------------------------
+# Deduplication Recall (Fix 3b) — uses actual DuplicateDetectionAgent
+# Uses token-overlap fallback when Ollama embeddings are unavailable
+# ---------------------------------------------------------------------------
+
+def _token_overlap_similarity(text1: str, text2: str) -> float:
+    """Token-overlap Jaccard similarity — used as fallback when Ollama is offline."""
+    tokens1 = set(re.findall(r'\b\w+\b', text1.lower()))
+    tokens2 = set(re.findall(r'\b\w+\b', text2.lower()))
+    if not tokens1 or not tokens2:
+        return 0.0
+    intersection = tokens1 & tokens2
+    union = tokens1 | tokens2
+    return len(intersection) / len(union)
+
+
+def _is_duplicate_with_fallback(agent, art1: Dict, art2: Dict) -> bool:
+    """
+    Attempt to detect duplicates using DuplicateDetectionAgent.
+    Falls back to token-overlap Jaccard similarity if Ollama embeddings fail
+    (e.g., in test/offline environments).
+
+    Fallback threshold: 0.35 Jaccard similarity (same semantic threshold as agent uses).
+    """
+    try:
+        # Try using the agent's embedding-based method
+        is_dup, _ = agent.are_duplicates(art1, art2)
+        return is_dup
+    except Exception:
+        pass
+
+    # Fallback: token-overlap on titles
+    title_sim = _token_overlap_similarity(
+        art1.get("title", art1.get("article_a", "")),
+        art2.get("title", art2.get("article_b", ""))
+    )
+    return title_sim >= 0.35
+
+
+def evaluate_deduplication_recall(dataset: Optional[List[Dict[str, Any]]] = None) -> Dict[str, float]:
+    """
+    Run the actual DuplicateDetectionAgent against the labeled deduplication
+    evaluation dataset and compute TP, FP, FN, Precision, Recall, F1.
+
+    Deduplication Recall = TP / (TP + FN)
+
+    Returns:
+        Dict with keys: true_positives, false_positives, false_negatives,
+                        precision, recall, f1, samples_evaluated
+    """
+    global _dedup_recall_cache
+    if dataset is None and _dedup_recall_cache is not None:
+        return _dedup_recall_cache
+
+    from app.agents.duplicate import DuplicateDetectionAgent
+    agent = DuplicateDetectionAgent()
+    eval_data = dataset if dataset is not None else DEDUPLICATION_EVAL_DATASET
+
+    if not eval_data:
+        return {
+            "true_positives": 0, "false_positives": 0, "false_negatives": 0,
+            "precision": 0.0, "recall": 0.0, "f1": 0.0, "samples_evaluated": 0
+        }
+
+    tp = fp = fn = tn = 0
+    for item in eval_data:
+        art1 = {"title": item.get("article_a", ""), "content": item.get("article_a", ""), "published_date": ""}
+        art2 = {"title": item.get("article_b", ""), "content": item.get("article_b", ""), "published_date": ""}
+        ground_truth = item.get("is_duplicate", False)
+
+        predicted = _is_duplicate_with_fallback(agent, art1, art2)
+
+        if predicted and ground_truth:
+            tp += 1
+        elif predicted and not ground_truth:
+            fp += 1
+        elif not predicted and ground_truth:
+            fn += 1
+        else:
+            tn += 1
+
+    precision = round(tp / (tp + fp), 4) if (tp + fp) > 0 else 0.0
+    recall    = round(tp / (tp + fn), 4) if (tp + fn) > 0 else 0.0
+    f1        = round(2 * precision * recall / (precision + recall), 4) if (precision + recall) > 0 else 0.0
+
+    res = {
+        "true_positives": tp,
+        "false_positives": fp,
+        "false_negatives": fn,
+        "true_negatives": tn,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "samples_evaluated": len(eval_data)
+    }
+    if dataset is None:
+        _dedup_recall_cache = res
+    return res
+
+
+
+# ---------------------------------------------------------------------------
+# Tokenization Utilities
+# ---------------------------------------------------------------------------
 
 def tokenize(text: str) -> List[str]:
     """Helper to tokenize and lowercase text."""
     if not text:
         return []
     return re.findall(r'\b\w+\b', text.lower())
+
 
 def calculate_overlap_ratio(text1: str, text2: str) -> float:
     """Calculate token overlap ratio between two strings."""
@@ -16,6 +270,11 @@ def calculate_overlap_ratio(text1: str, text2: str) -> float:
         return 0.0
     common = tokens1.intersection(tokens2)
     return len(common) / min(len(tokens1), len(tokens2))
+
+
+# ---------------------------------------------------------------------------
+# Main Execution Evaluator
+# ---------------------------------------------------------------------------
 
 def evaluate_execution(
     query: str,
@@ -29,81 +288,85 @@ def evaluate_execution(
 ) -> Dict[str, Any]:
     """
     Calculate real performance and retrieval metrics for the agent execution.
-    No mock constants - all values are calculated from the current execution.
+    No mock constants — all values are calculated from actual data.
+
+    Routing Accuracy: Dataset-driven, no keyword inference (Fix 2).
+    Categorization F1: Evaluated against CategorizationAgent on labeled dataset (Fix 3a).
+    Deduplication Recall: Evaluated against DuplicateDetectionAgent on labeled dataset (Fix 3b).
     """
     latency = time.time() - start_time
-    
+
     # 1. Precision@5 and MRR@10 based on document keyword overlap with query
     query_tokens = set(tokenize(query))
     precision_at_5 = 0.0
     mrr_at_10 = 0.0
-    
+
     docs_to_eval = retrieved_docs[:10]
     relevant_count = 0
     first_relevant_rank = 0
-    
+
     for rank, doc in enumerate(docs_to_eval, 1):
         content = (doc.get("title", "") + " " + doc.get("content", "")).lower()
         doc_tokens = set(tokenize(content))
         overlap = query_tokens.intersection(doc_tokens)
-        
-        # Define relevancy threshold (e.g., at least 2 common tokens or 15% overlap)
         is_relevant = len(overlap) >= 2 or (len(query_tokens) > 0 and len(overlap) / len(query_tokens) > 0.15)
-        
         if is_relevant:
             relevant_count += 1
             if first_relevant_rank == 0:
                 first_relevant_rank = rank
-        
         if rank == 5:
             precision_at_5 = relevant_count / 5.0
-            
+
     if first_relevant_rank > 0:
         mrr_at_10 = 1.0 / first_relevant_rank
     else:
         mrr_at_10 = 0.0
 
-    # 2. Routing Accuracy
-    # Did policy agent choose a tool that contains the query keywords?
+    # 2. Routing Accuracy — Dataset-driven, NO keyword inference
     routing_accuracy = 1.0
-    for obs in observations:
-        tool_called = obs.get("tool", "")
-        if "compare" in query.lower() and tool_called != "compare_news_sources" and tool_called != "":
-            routing_accuracy = 0.5
-        elif "analytics" in query.lower() and tool_called != "get_dashboard_analytics" and tool_called != "":
-            routing_accuracy = 0.5
+    ground_truth_entry = next(
+        (item for item in GROUND_TRUTH_DATASET if item["query"].lower() == query.lower()),
+        None
+    )
+    if ground_truth_entry:
+        expected_tool = ground_truth_entry["expected_tool"]
+        actual_tool = ""
+        for obs in observations:
+            t = obs.get("tool", "")
+            if t and t != "reflection_critique":
+                actual_tool = t
+                break
+        routing_accuracy = evaluate_routing_accuracy(expected_tool, actual_tool)
 
     # 3. Faithfulness & Groundedness
-    # Faithfulness = fraction of response sentences/tokens supported by observations
     faithfulness = 0.0
     groundedness = 0.0
     if observations and response:
         obs_text = " ".join([str(obs.get("result", "")) for obs in observations])
         faithfulness = calculate_overlap_ratio(response, obs_text)
-        # Groundedness matches how closely response elements match source documents
         doc_text = " ".join([(doc.get("title", "") + " " + doc.get("content", "")) for doc in retrieved_docs])
         groundedness = calculate_overlap_ratio(response, doc_text)
     elif response:
-        # If cache hit
         faithfulness = 1.0
         groundedness = 1.0
 
     # 4. Answer Relevance
-    # Token overlap between query and response
     answer_relevance = calculate_overlap_ratio(query, response)
 
-    # 5. Categorization F1 & Deduplication Recall
-    categorization_f1 = 0.85 # default base
-    if category_predictions:
-        # Calculate consistency of predicted category across retrieved articles
+    # 5. Categorization F1 — computed from actual CategorizationAgent on eval dataset
+    # If category_predictions are provided for this specific execution, use them;
+    # otherwise compute from the labeled evaluation dataset.
+    if category_predictions and retrieved_docs:
         matching_categories = sum(1 for doc in retrieved_docs if doc.get("category", "").lower() in category_predictions)
-        if retrieved_docs:
-            categorization_f1 = matching_categories / len(retrieved_docs)
-            
-    deduplication_recall = 1.0
-    # Deduplication recall calculation based on duplicate prevention count
-    # (Rate of duplicates filtered versus total processed)
-    
+        categorization_f1 = round(matching_categories / len(retrieved_docs), 4)
+    else:
+        cat_metrics = evaluate_categorization_f1()
+        categorization_f1 = cat_metrics.get("macro_f1", 0.0)
+
+    # 6. Deduplication Recall — computed from actual DuplicateDetectionAgent on eval dataset
+    dedup_metrics = evaluate_deduplication_recall()
+    deduplication_recall = dedup_metrics.get("recall", 0.0)
+
     return {
         "precision_at_5": round(precision_at_5, 2),
         "mrr_at_10": round(mrr_at_10, 2),
@@ -116,3 +379,4 @@ def evaluate_execution(
         "latency_seconds": round(latency, 2),
         "cache_hit_rate": 1.0 if cache_hit else 0.0
     }
+

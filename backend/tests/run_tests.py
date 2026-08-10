@@ -17,7 +17,7 @@ def run_all_tests():
         module_name = file_name[:-3]
         file_path = os.path.join(tests_dir, file_name)
         
-        print(f"\nRunning tests in module: {module_name}")
+        print(f"\nRunning tests in module: {module_name}", flush=True)
         
         # Load module dynamically
         spec = importlib.util.spec_from_file_location(module_name, file_path)
@@ -36,20 +36,20 @@ def run_all_tests():
                     asyncio.run(func())
                 else:
                     func()
-                print(f"  [PASS] {func_name}")
+                print(f"  [PASS] {func_name}", flush=True)
                 passed_tests += 1
             except AssertionError as e:
-                print(f"  [FAIL] {func_name} (Assertion Failed)")
+                print(f"  [FAIL] {func_name} (Assertion Failed)", flush=True)
                 traceback.print_exc(limit=2)
                 failed_tests += 1
             except Exception as e:
-                print(f"  [ERROR] {func_name}: {e}")
+                print(f"  [ERROR] {func_name}: {e}", flush=True)
                 traceback.print_exc(limit=2)
                 failed_tests += 1
                 
-    print(f"\n=========================================")
-    print(f"Test Summary: {passed_tests} Passed, {failed_tests} Failed")
-    print(f"=========================================")
+    print(f"\n=========================================", flush=True)
+    print(f"Test Summary: {passed_tests} Passed, {failed_tests} Failed", flush=True)
+    print(f"=========================================", flush=True)
     
     if failed_tests > 0:
         sys.exit(1)

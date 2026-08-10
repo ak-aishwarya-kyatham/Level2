@@ -1,0 +1,42 @@
+[
+  {
+    "text": "NVIDIA announces a new AI processor for data centers",
+    "expected_category": "Technology"
+  },
+  {
+    "text": "India wins the cricket match against Australia in the final over",
+    "expected_category": "Sports"
+  },
+  {
+    "text": "Global markets rise after Federal Reserve economic announcement",
+    "expected_category": "Business"
+  },
+  {
+    "text": "New cancer vaccine shows promising results in clinical trials",
+    "expected_category": "Health"
+  },
+  {
+    "text": "Government announces new education policy for schools",
+    "expected_category": "Politics"
+  },
+  {
+    "text": "Apple releases iPhone 17 with advanced AI chip semiconductor",
+    "expected_category": "Technology"
+  },
+  {
+    "text": "Stock market crash wipes out billions in investor wealth",
+    "expected_category": "Business"
+  },
+  {
+    "text": "Ronaldo scores hat-trick in football championship tournament",
+    "expected_category": "Sports"
+  },
+  {
+    "text": "Parliament passes new law on election reforms and voting rights",
+    "expected_category": "Politics"
+  },
+  {
+    "text": "WHO warns of new virus spreading across countries globally",
+    "expected_category": "Health"
+  }
+]

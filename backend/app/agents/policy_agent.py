@@ -113,8 +113,9 @@ class PolicyAgent:
                         "temperature": 0.0
                     }
                 },
-                timeout=90
+                timeout=12
             )
+
             if response.status_code == 200:
                 raw_text = response.json().get("response", "").strip()
                 cleaned_text = self._sanitize_json_string(raw_text)
@@ -146,6 +147,7 @@ class PolicyAgent:
         else:
             return PolicyAction(
                 action="finish",
-                answer="I apologize, but I encountered an error communicating with the language model backend.",
-                thought="Encountered an exception. Terminating loop."
+                answer="",
+                thought="Encountered an exception. Synthesizing answer from retrieved observations."
             )
+

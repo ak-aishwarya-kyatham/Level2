@@ -34,19 +34,24 @@ class DuplicateDetectionAgent:
         """Fetch text embeddings using Ollama bge-m3 model with local fallback."""
         if not text or not text.strip():
             return []
-        try:
-            r = requests.post(
-                f"{OLLAMA_URL}/api/embeddings",
-                json={"model": "bge-m3:latest", "prompt": text.strip()[:1000]},
-                timeout=5
-            )
-            if r.status_code == 200:
-                emb = r.json().get("embedding", [])
-                if emb:
-                    return emb
-        except Exception as e:
-            logger.warning(f"Ollama embedding lookup failed: {e}")
-            
+        if not hasattr(self, "_ollama_failed"):
+            self._ollama_failed = False
+
+        if not self._ollama_failed:
+            try:
+                r = requests.post(
+                    f"{OLLAMA_URL}/api/embeddings",
+                    json={"model": "bge-m3:latest", "prompt": text.strip()[:1000]},
+                    timeout=0.3
+                )
+                if r.status_code == 200:
+                    emb = r.json().get("embedding", [])
+                    if emb:
+                        return emb
+            except Exception as e:
+                self._ollama_failed = True
+                logger.warning(f"Ollama embedding lookup failed ({e}), using local fallback.")
+
         try:
             from app.agents.embedding import EmbeddingAgent
             if not hasattr(self, "_fallback_agent"):
@@ -55,6 +60,7 @@ class DuplicateDetectionAgent:
         except Exception as fallback_err:
             logger.error(f"Fallback embedding failed: {fallback_err}")
         return []
+
 
     def extract_named_entities(self, text: str) -> Set[str]:
         """Extract coarse named entities (capitalized words) for overlap analysis."""
