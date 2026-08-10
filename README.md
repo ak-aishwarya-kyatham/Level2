@@ -150,3 +150,9 @@ The platform incorporates 4 key architectural features:
    - Integrates SHA-256 query digest hashing (`newsintel:query:<sha256>`) with configurable TTL (`CACHE_TTL_SECONDS`).
    - Tracks dynamic hit/miss metrics in real time with fast offline connection fallbacks (`socket_connect_timeout=0.2s`).
 
+5. **Real End-to-End Latency & Dynamic Cache-Hit State Propagation (`main_workflow.py`, `evaluator.py`, `test_latency_cache.py`):**
+   - Replaced artificial timing offsets (`time.time() - 2.0`) with high-precision `time.perf_counter()` captured once at request entry and measured across the complete multi-step workflow.
+   - Dynamically detects and propagates actual Redis GET HIT/MISS boolean state (`cache_hit: True/False`) into `AgentState` and passes real runtime timing to `evaluate_execution()`.
+   - Validated by 6 automated tests in [`test_latency_cache.py`](file:///c:/Users/AishwaryaK/Desktop/agent/backend/tests/test_latency_cache.py) (48/48 total backend tests passing).
+
+
