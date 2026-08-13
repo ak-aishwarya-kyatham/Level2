@@ -12,7 +12,10 @@ Tests:
 """
 
 import hashlib
+import pytest
 from unittest.mock import patch, MagicMock
+
+pytestmark = pytest.mark.unit
 
 import sys
 import os

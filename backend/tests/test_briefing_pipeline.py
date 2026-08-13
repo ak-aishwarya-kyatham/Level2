@@ -1,6 +1,9 @@
-# No pytest import needed
-from app.agents.duplicate import DuplicateDetectionAgent
+import pytest
+from unittest.mock import patch
+from app.agents.duplicate import DuplicateDetectionAgent, generate_fallback_embedding
 from app.agents.response import synthesize_executive_summary
+
+pytestmark = pytest.mark.integration
 
 def test_duplicate_detection_agent_logic():
     agent = DuplicateDetectionAgent()
@@ -26,13 +29,86 @@ def test_duplicate_detection_agent_logic():
         "published_date": "2026-08-04T10:30:00Z"
     }
     
-    # Check that duplicates are detected (similar titles/entities/content)
-    is_dup1, _ = agent.are_duplicates(art1, art2)
+    # Check that duplicate articles are detected (similar titles/entities/content)
+    is_dup1, sim1 = agent.are_duplicates(art1, art2)
     assert is_dup1 is True
+    assert sim1 > 0.5
     
-    # Check that non-duplicates are not detected
-    is_dup2, _ = agent.are_duplicates(art1, art3)
+    # Check that non-duplicate articles are not incorrectly marked duplicate
+    is_dup2, sim2 = agent.are_duplicates(art1, art3)
     assert is_dup2 is False
+    assert sim2 < 0.55
+
+
+def test_duplicate_detection_dependency_injection():
+    """Verify that DuplicateDetectionAgent works with an injected mock embedding provider."""
+    called_queries = []
+
+    def mock_provider(text: str):
+        called_queries.append(text)
+        return generate_fallback_embedding(text)
+
+    agent = DuplicateDetectionAgent(embedding_provider=mock_provider)
+
+    art1 = {
+        "title": "Nvidia launches new H200 AI accelerator chip",
+        "content": "Nvidia announced the release of its new H200 artificial intelligence chip with enhanced memory bandwidth.",
+        "published_date": "2026-08-04T10:00:00Z"
+    }
+    art2 = {
+        "title": "Nvidia launches new H200 AI accelerator chip",
+        "content": "Nvidia announced the release of its new H200 artificial intelligence chip with enhanced memory bandwidth for data centers.",
+        "published_date": "2026-08-04T10:05:00Z"
+    }
+    art3 = {
+        "title": "Federal Reserve maintains benchmark interest rate",
+        "content": "The Fed decided to hold target interest rates steady amidst slowing inflation.",
+        "published_date": "2026-08-04T10:30:00Z"
+    }
+
+    is_dup, _ = agent.are_duplicates(art1, art2)
+    assert is_dup is True
+    assert len(called_queries) >= 2
+
+    is_non_dup, _ = agent.are_duplicates(art1, art3)
+    assert is_non_dup is False
+
+
+def test_duplicate_detection_offline_behavior():
+    """Verify duplicate detection passes when Ollama, HuggingFace, and internet are completely offline."""
+    agent = DuplicateDetectionAgent()
+
+    art1 = {
+        "title": "Samsung bans smart TV apps that expose internet connections",
+        "content": "Samsung announced that it will ban any Smart TV application that shares or exposes users' internet connections without explicit authorization.",
+        "source": "TechCrunch",
+        "published_date": "2026-08-04T10:00:00Z"
+    }
+    art2 = {
+        "title": "Samsung Says It's Banning Smart TV Apps That Expose Users' Internet Connections",
+        "content": "In a move to secure client data, Samsung is banning TV apps exposing connections.",
+        "source": "Engadget",
+        "published_date": "2026-08-04T10:15:00Z"
+    }
+    art3 = {
+        "title": "Microsoft discloses major Azure network outage",
+        "content": "Microsoft is investigating a global cloud outage affecting Azure networks.",
+        "source": "Reuters",
+        "published_date": "2026-08-04T10:30:00Z"
+    }
+
+    # Simulate total network/service failure for Ollama and Transformers
+    with patch("requests.post", side_effect=ConnectionError("Offline: No network")), \
+         patch("app.agents.embedding.EmbeddingAgent.get_embedding_sync", return_value=[]):
+        is_dup, sim = agent.are_duplicates(art1, art2)
+        assert is_dup is True
+        assert sim > 0.5
+
+        is_non_dup, sim_non = agent.are_duplicates(art1, art3)
+        assert is_non_dup is False
+        assert sim_non < 0.4
+
+
 
 def test_choose_better_article():
     agent = DuplicateDetectionAgent()

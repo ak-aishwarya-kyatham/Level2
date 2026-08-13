@@ -1,23 +1,51 @@
+import hashlib
 import logging
 import numpy as np
 import re
 import requests
-from typing import List, Dict, Any, Tuple, Set
+from typing import List, Dict, Any, Tuple, Set, Optional, Callable
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 OLLAMA_URL = "http://localhost:11434"
 
+def generate_fallback_embedding(text: str, dim: int = 1024) -> List[float]:
+    """
+    Deterministic L2-normalized term-frequency feature vector generator used when
+    production ML models (Ollama/BAAI/bge-m3) or network services are unavailable.
+    """
+    if not text or not text.strip():
+        return [0.0] * dim
+    words = re.findall(r"\w+", text.lower())
+    if not words:
+        return [0.0] * dim
+    vec = np.zeros(dim, dtype=float)
+    for word in words:
+        idx = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16) % dim
+        vec[idx] += 1.0
+    norm = np.linalg.norm(vec)
+    if norm > 0:
+        vec = vec / norm
+    return vec.tolist()
+
+
 class DuplicateDetectionAgent:
     """
     Advanced duplicate news detection using title/content semantic embeddings,
     named entity comparison, and publication timestamps.
     """
-    def __init__(self, title_threshold: float = 0.70, content_threshold: float = 0.70, combined_threshold: float = 0.55):
+    def __init__(
+        self,
+        title_threshold: float = 0.70,
+        content_threshold: float = 0.70,
+        combined_threshold: float = 0.55,
+        embedding_provider: Optional[Any] = None
+    ):
         self.title_threshold = title_threshold
         self.content_threshold = content_threshold
         self.combined_threshold = combined_threshold
+        self.embedding_provider = embedding_provider
 
     def cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         if not vec1 or not vec2:
@@ -30,10 +58,46 @@ class DuplicateDetectionAgent:
             return 0.0
         return float(np.dot(v1, v2) / (norm1 * norm2))
 
+    async def run(self, target_embedding: List[float], existing_embeddings: List[List[float]], threshold: float = 0.85) -> Tuple[bool, float]:
+        """
+        Checks if target_embedding is a duplicate against a list of existing vector embeddings.
+        Returns (is_duplicate: bool, max_similarity: float).
+        """
+        if not target_embedding or not existing_embeddings:
+            return False, 0.0
+
+        max_sim = 0.0
+        for existing in existing_embeddings:
+            if existing:
+                sim = self.cosine_similarity(target_embedding, existing)
+                if sim > max_sim:
+                    max_sim = sim
+
+        is_dup = max_sim >= threshold
+        return is_dup, max_sim
+
     def get_ollama_embedding(self, text: str) -> List[float]:
-        """Fetch text embeddings using Ollama bge-m3 model with local fallback."""
+        """Fetch text embeddings using injected provider, Ollama bge-m3 model, or local fallback."""
         if not text or not text.strip():
             return []
+
+        # 1. Dependency injection check
+        if self.embedding_provider is not None:
+            try:
+                if callable(self.embedding_provider):
+                    emb = self.embedding_provider(text)
+                elif hasattr(self.embedding_provider, "get_embedding_sync"):
+                    emb = self.embedding_provider.get_embedding_sync(text)
+                elif hasattr(self.embedding_provider, "get_embedding"):
+                    emb = self.embedding_provider.get_embedding(text)
+                else:
+                    emb = []
+                if emb:
+                    return emb
+            except Exception as e:
+                logger.warning(f"Injected embedding provider error: {e}")
+
+        # 2. Ollama bge-m3 model lookup
         if not hasattr(self, "_ollama_failed"):
             self._ollama_failed = False
 
@@ -52,14 +116,20 @@ class DuplicateDetectionAgent:
                 self._ollama_failed = True
                 logger.warning(f"Ollama embedding lookup failed ({e}), using local fallback.")
 
+        # 3. Local BAAI/bge-m3 via EmbeddingAgent
         try:
             from app.agents.embedding import EmbeddingAgent
             if not hasattr(self, "_fallback_agent"):
                 self._fallback_agent = EmbeddingAgent()
-            return self._fallback_agent.get_embedding_sync(text)
+            emb = self._fallback_agent.get_embedding_sync(text)
+            if emb:
+                return emb
         except Exception as fallback_err:
             logger.error(f"Fallback embedding failed: {fallback_err}")
-        return []
+
+        # 4. Safe deterministic fallback vector when ML models/network are offline
+        return generate_fallback_embedding(text)
+
 
 
     def extract_named_entities(self, text: str) -> Set[str]:

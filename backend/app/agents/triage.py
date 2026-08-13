@@ -12,15 +12,32 @@ def triage_agent(state: AgentState) -> AgentState:
     logger.info("Triage Agent analyzing intent...")
     query = state.get("query", "").lower().strip()
     
-    # Extract requested number of items if specified (e.g. "top 1", "top 3", "first 5", "1 feed")
-    limit_match = re.search(r'\b(?:top|first|only|limit)\s*(\d+)\b', query) or re.search(r'\b(\d+)\s*(?:items?|feeds?|articles?|topics?)\b', query)
-    if limit_match:
+    # Strip UI greeting/prefill artifacts (e.g. ", or compare news sources! what is...")
+    query = re.sub(r"^(?:,\s*or\s+compare\s+news\s+sources[!.]*|ask\s+me\s+to\s+summarize\s+recent\s+news[,\s]*|search\s+specific\s+topics[,\s]*|analyze\s+trends[,\s]*)+", "", query, flags=re.IGNORECASE).strip()
+    
+    # Extract requested number of items if specified (e.g. "top 1", "top 3", "give me 1", "give me one", "1 topic", "only 2")
+    number_words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+    
+    limit_match = re.search(r'\b(?:top|first|only|limit|give me|show me|get|just)\s*(\d+)\b', query) or \
+                  re.search(r'\b(\d+)\s*(?:items?|feeds?|articles?|topics?|news)?\b', query)
+    
+    if limit_match and limit_match.group(1):
         try:
             state["requested_limit"] = int(limit_match.group(1))
         except Exception:
             state["requested_limit"] = 10
     else:
-        state["requested_limit"] = 10
+        found_limit = None
+        for word_str, word_val in number_words.items():
+            if re.search(rf'\b(?:give me|show me|top|first|only|just|get)?\s*{word_str}\b', query):
+                found_limit = word_val
+                break
+        if found_limit is not None:
+            state["requested_limit"] = found_limit
+        elif re.search(r'\b(?:the\s+)?(?:latest\s+)?trending\s+topic\b', query) and not re.search(r'\b(?:topics|articles|feeds)\b', query):
+            state["requested_limit"] = 1
+        else:
+            state["requested_limit"] = 10
 
     # Keyword-based intent extraction
     if "summarize" in query or "summary" in query or "briefing" in query:

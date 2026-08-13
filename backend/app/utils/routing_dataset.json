@@ -38,5 +38,14 @@
   {
     "query": "What are the top news categories right now?",
     "expected_tool": "get_dashboard_analytics"
+  },
+  {
+    "query": "Compare CNN and Reuters reporting on renewable energy",
+    "expected_tool": "compare_news_sources"
+  },
+  {
+    "query": "Fetch system health and platform performance metrics",
+    "expected_tool": "get_dashboard_analytics"
   }
 ]
+

@@ -13,7 +13,8 @@ from app.agents.categorization import CategorizationAgent
 
 logger = logging.getLogger(__name__)
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "articles_store.json")
+def get_data_file_path() -> str:
+    return os.getenv("ARTICLES_DATA_FILE", os.path.join(os.path.dirname(__file__), "..", "data", "articles_store.json"))
 
 class NewsRepository:
     def __init__(self):
@@ -39,21 +40,31 @@ class NewsRepository:
 
         self._load_from_disk()
 
+    def get_all_embeddings(self) -> List[List[float]]:
+        """Returns all stored article embeddings for duplicate detection comparison."""
+        embeddings = []
+        for art in self.articles:
+            emb = art.get("embedding")
+            if emb and isinstance(emb, list):
+                embeddings.append(emb)
+        return embeddings
 
     def _load_from_disk(self):
-        if os.path.exists(DATA_FILE):
+        data_file = get_data_file_path()
+        if os.path.exists(data_file):
             try:
-                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                with open(data_file, "r", encoding="utf-8") as f:
                     self.articles = json.load(f)
-                logger.info(f"Loaded {len(self.articles)} cached articles from disk.")
+                logger.info(f"Loaded {len(self.articles)} cached articles from disk ({data_file}).")
             except Exception as e:
                 logger.error(f"Failed to load articles from disk: {e}")
                 self.articles = []
 
     def _save_to_disk(self):
+        data_file = get_data_file_path()
         try:
-            os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
-            with open(DATA_FILE, "w", encoding="utf-8") as f:
+            os.makedirs(os.path.dirname(data_file), exist_ok=True)
+            with open(data_file, "w", encoding="utf-8") as f:
                 json.dump(self.articles, f, indent=2, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Failed to save articles to disk: {e}")
@@ -118,7 +129,9 @@ class NewsRepository:
             return []
 
         terms = []
-        quoted = re.findall(r'["\u201c\u201d\u2018\u2019\']([^"\u201c\u201d\u2018\u2019\']+)["\u201c\u201d\u2018\u2019\']', query)
+        quoted = re.findall(r'["\u201c\u201d]([^"\u201c\u201d]+)["\u201c\u201d]', query)
+        if not quoted:
+            quoted = re.findall(r"['\u2018\u2019]([^'\u2018\u2019]+)['\u2018\u2019]", query)
         if quoted:
             for q in quoted:
                 q_clean = q.strip()

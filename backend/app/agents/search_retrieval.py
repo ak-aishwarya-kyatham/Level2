@@ -401,13 +401,14 @@ async def retrieval_agent(state: AgentState) -> AgentState:
             texts_to_embed.append(content if content.strip() else "No content available")
             
         try:
-            r = requests.post(
+            from app.utils.async_http import async_post_json
+            status_code, data, text = await async_post_json(
                 "http://localhost:11434/api/embed",
-                json={"model": "bge-m3:latest", "input": texts_to_embed},
-                timeout=15
+                payload={"model": "bge-m3:latest", "input": texts_to_embed},
+                timeout=15.0
             )
-            if r.status_code == 200:
-                embeddings = r.json().get("embeddings", [])
+            if status_code == 200:
+                embeddings = data.get("embeddings", [])
                 if len(embeddings) == len(texts_to_embed):
                     query_emb = embeddings[0]
                     for i, art in enumerate(retrieved_docs):
@@ -418,7 +419,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
                 else:
                     logger.warning("Batch embedding response length mismatch. Falling back to lazy execution.")
             else:
-                logger.warning(f"Batch embedding returned status {r.status_code}. Falling back to lazy execution.")
+                logger.warning(f"Batch embedding returned status {status_code}. Falling back to lazy execution.")
         except Exception as e:
             logger.warning(f"Batch embedding failed: {e}. Falling back to lazy execution.")
     

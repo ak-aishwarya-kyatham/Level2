@@ -1,6 +1,10 @@
+import os
 import time
 import asyncio
 import re
+import pytest
+
+pytestmark = pytest.mark.integration
 from app.workflows.langgraph_state import AgentState
 from app.workflows.main_workflow import app_graph, cache_node, reflection_node
 from app.utils.evaluator import evaluate_execution
@@ -171,7 +175,8 @@ def test_evaluator_receives_real_cache_state():
 
 def test_no_artificial_timing_in_codebase():
     """Test 6: Verify no time.time() - 2.0 or hardcoded offsets remain in main_workflow.py."""
-    with open("app/workflows/main_workflow.py", "r", encoding="utf-8") as f:
+    workflow_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app", "workflows", "main_workflow.py")
+    with open(workflow_path, "r", encoding="utf-8") as f:
         content = f.read()
     
     assert "time.time() - 2.0" not in content

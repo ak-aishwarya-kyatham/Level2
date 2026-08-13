@@ -3,6 +3,11 @@ import sys
 import importlib.util
 import traceback
 
+import inspect
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 def run_all_tests():
     print("Starting test discovery...")
     tests_dir = os.path.dirname(os.path.abspath(__file__))
@@ -32,7 +37,7 @@ def run_all_tests():
             try:
                 # Call test function
                 import asyncio
-                if asyncio.iscoroutinefunction(func):
+                if inspect.iscoroutinefunction(func):
                     asyncio.run(func())
                 else:
                     func()

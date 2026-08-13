@@ -3,24 +3,228 @@ import json
 import logging
 import time
 import requests
-from typing import List, Dict, Any
-from pydantic import BaseModel, Field, ValidationError
+from typing import List, Dict, Any, Literal, Tuple, Optional
+from pydantic import BaseModel, Field, model_validator, ValidationError
 
 logger = logging.getLogger(__name__)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
 class PolicyAction(BaseModel):
-    action: str = Field(..., description="Must be 'tool' or 'finish'")
-    tool: str = Field(None, description="Name of tool if action is 'tool'")
+    action: Literal["tool", "finish"] = Field(..., description="Action type must strictly be 'tool' or 'finish'")
+    tool: Optional[str] = Field(None, description="Name of tool if action is 'tool'")
     arguments: Dict[str, Any] = Field(default_factory=dict, description="Arguments for tool if action is 'tool'")
-    answer: str = Field(None, description="Final response to user if action is 'finish'")
+    answer: Optional[str] = Field(None, description="Final response to user if action is 'finish'")
     thought: str = Field(default="Analyzing query and deciding action.", description="Detailed thoughts/reasoning behind the decision")
+    is_valid: bool = Field(default=True, description="Whether action passed strict schema validation")
+    validation_error: Optional[str] = Field(default=None, description="Structured error message if validation failed")
+
+    @model_validator(mode="after")
+    def validate_action_fields(self) -> "PolicyAction":
+        if self.action == "tool":
+            if not self.tool or not str(self.tool).strip():
+                raise ValueError("Field 'tool' is required and cannot be empty when action is 'tool'.")
+            if not isinstance(self.arguments, dict):
+                raise ValueError("Field 'arguments' must be a dictionary/object when action is 'tool'.")
+        elif self.action == "finish":
+            if self.answer is None or not str(self.answer).strip():
+                raise ValueError("Field 'answer' is required and cannot be empty when action is 'finish'.")
+        return self
+
+def validate_policy_action_against_mcp_schemas(
+    action: PolicyAction,
+    tools: List[Dict[str, Any]]
+) -> Tuple[bool, str]:
+    """
+    Validates a PolicyAction against dynamically discovered MCP tool schemas.
+    Checks:
+    1. Action validity ('tool' or 'finish')
+    2. Tool existence in MCP tool schemas
+    3. Required arguments
+    4. Argument types (string, integer, number, boolean, array, object)
+    5. Value limits/ranges (minimum, maximum, minLength, maxLength, enum)
+    """
+    if not action.is_valid and action.validation_error:
+        return False, action.validation_error
+
+    if action.action == "finish":
+        if action.answer is None or not str(action.answer).strip():
+            return False, "INVALID FINISH ACTION: 'answer' field is required when action is 'finish'."
+        return True, "Valid finish action."
+
+    if action.action == "tool":
+        tool_name = action.tool
+        if not tool_name or not str(tool_name).strip():
+            return False, "INVALID TOOL: 'tool' field is required when action is 'tool'."
+
+        # Look up tool in MCP schemas
+        matching_tool = None
+        for t in tools:
+            if t.get("name") == tool_name:
+                matching_tool = t
+                break
+
+        if not matching_tool:
+            available_names = [t.get("name") for t in tools if t.get("name")]
+            return False, f"INVALID TOOL: Unknown tool '{tool_name}'. Available tools: {available_names}"
+
+        # Validate arguments against inputSchema
+        input_schema = matching_tool.get("inputSchema") or matching_tool.get("input_schema") or {}
+        properties = input_schema.get("properties", {})
+        required_fields = input_schema.get("required", [])
+
+        args = action.arguments if isinstance(action.arguments, dict) else {}
+
+        # 1. Required arguments check
+        for req_field in required_fields:
+            if req_field not in args or args[req_field] is None:
+                return False, f"MISSING REQUIRED ARGUMENT: Tool '{tool_name}' requires argument '{req_field}'."
+
+        # 2. Argument types & range checks
+        for arg_key, arg_val in args.items():
+            if arg_key in properties:
+                prop_schema = properties[arg_key]
+                expected_type = prop_schema.get("type")
+
+                if expected_type:
+                    valid_type = True
+                    if expected_type == "string" and not isinstance(arg_val, str):
+                        valid_type = False
+                    elif expected_type == "integer" and (not isinstance(arg_val, int) or isinstance(arg_val, bool)):
+                        valid_type = False
+                    elif expected_type == "number" and (not isinstance(arg_val, (int, float)) or isinstance(arg_val, bool)):
+                        valid_type = False
+                    elif expected_type == "boolean" and not isinstance(arg_val, bool):
+                        valid_type = False
+                    elif expected_type == "array" and not isinstance(arg_val, list):
+                        valid_type = False
+                    elif expected_type == "object" and not isinstance(arg_val, dict):
+                        valid_type = False
+
+                    if not valid_type:
+                        return False, f"INVALID ARGUMENT TYPE: Argument '{arg_key}' for tool '{tool_name}' must be of type '{expected_type}', got '{type(arg_val).__name__}'."
+
+                # Range / value checks
+                if "minimum" in prop_schema and isinstance(arg_val, (int, float)):
+                    min_val = prop_schema["minimum"]
+                    if arg_val < min_val:
+                        return False, f"INVALID ARGUMENT VALUE: Argument '{arg_key}' ({arg_val}) is below minimum of {min_val}."
+
+                if "maximum" in prop_schema and isinstance(arg_val, (int, float)):
+                    max_val = prop_schema["maximum"]
+                    if arg_val > max_val:
+                        return False, f"INVALID ARGUMENT VALUE: Argument '{arg_key}' ({arg_val}) exceeds maximum of {max_val}."
+
+                if "minLength" in prop_schema and isinstance(arg_val, str):
+                    min_len = prop_schema["minLength"]
+                    if len(arg_val) < min_len:
+                        return False, f"INVALID ARGUMENT VALUE: Argument '{arg_key}' length ({len(arg_val)}) is below minLength of {min_len}."
+
+                if "maxLength" in prop_schema and isinstance(arg_val, str):
+                    max_len = prop_schema["maxLength"]
+                    if len(arg_val) > max_len:
+                        return False, f"INVALID ARGUMENT VALUE: Argument '{arg_key}' length ({len(arg_val)}) exceeds maxLength of {max_len}."
+
+                if "enum" in prop_schema:
+                    allowed_enum = prop_schema["enum"]
+                    if arg_val not in allowed_enum:
+                        return False, f"INVALID ARGUMENT VALUE: Argument '{arg_key}' ('{arg_val}') must be one of {allowed_enum}."
+
+        return True, "Valid tool action."
+
+    return False, f"INVALID ACTION: Unknown action type '{action.action}'."
+
+def parse_and_validate_policy_action(
+    raw_input: Any,
+    tools: List[Dict[str, Any]]
+) -> PolicyAction:
+    """
+    Parses raw LLM text, dict, or object into a PolicyAction and performs strict Pydantic + MCP schema validation.
+    If parsing or validation fails, returns an invalid PolicyAction containing the structured validation error message.
+    """
+    if isinstance(raw_input, str):
+        cleaned = raw_input.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
+        try:
+            data = json.loads(cleaned)
+        except json.JSONDecodeError as err:
+            return PolicyAction(
+                action="tool",
+                tool="invalid_json",
+                arguments={},
+                thought="Failed to parse LLM response as JSON.",
+                is_valid=False,
+                validation_error=f"MALFORMED OUTPUT: Response is not valid JSON. Error: {str(err)}"
+            )
+    elif isinstance(raw_input, dict):
+        data = raw_input
+    elif isinstance(raw_input, PolicyAction):
+        # Validate existing PolicyAction against schemas
+        is_valid, err_msg = validate_policy_action_against_mcp_schemas(raw_input, tools)
+        raw_input.is_valid = is_valid
+        raw_input.validation_error = err_msg if not is_valid else None
+        return raw_input
+    else:
+        return PolicyAction(
+            action="tool",
+            tool="invalid_output",
+            arguments={},
+            thought="LLM response was neither string nor dict.",
+            is_valid=False,
+            validation_error="MALFORMED OUTPUT: LLM response must be a JSON string or dict."
+        )
+
+    if not isinstance(data, dict):
+        return PolicyAction(
+            action="tool",
+            tool="invalid_json_structure",
+            arguments={},
+            thought="JSON payload is not an object/dict.",
+            is_valid=False,
+            validation_error="MALFORMED OUTPUT: JSON response must be a dictionary object."
+        )
+
+    # Attempt Pydantic model validation
+    try:
+        action_obj = PolicyAction.model_validate(data)
+    except ValidationError as val_err:
+        err_msg = val_err.errors()[0].get("msg", str(val_err))
+        tool_name = str(data.get("tool") or "invalid_action")
+        return PolicyAction(
+            action="tool",
+            tool=tool_name,
+            arguments=data.get("arguments") if isinstance(data.get("arguments"), dict) else {},
+            thought=str(data.get("thought", "Pydantic validation failed.")),
+            is_valid=False,
+            validation_error=f"INVALID OUTPUT: {err_msg}"
+        )
+    except Exception as ex:
+        return PolicyAction(
+            action="tool",
+            tool="invalid_action",
+            arguments={},
+            thought="Parsing failed.",
+            is_valid=False,
+            validation_error=f"INVALID OUTPUT: {str(ex)}"
+        )
+
+    # Perform MCP schema & parameter validation
+    is_valid, error_msg = validate_policy_action_against_mcp_schemas(action_obj, tools)
+    action_obj.is_valid = is_valid
+    action_obj.validation_error = error_msg if not is_valid else None
+    return action_obj
 
 class PolicyAgent:
     """
     Policy Agent that decides whether to invoke an MCP tool or finish the request.
-    Uses local Ollama (Qwen) LLM and outputs validated JSON.
+    Uses local Ollama (Qwen) LLM and outputs strictly validated JSON.
     """
     def __init__(self, model_name: str = "qwen2.5:3b"):
         self.model_name = model_name
@@ -38,7 +242,7 @@ class PolicyAgent:
 
     async def decide_action(self, query: str, tools: List[Dict[str, Any]], history: List[Dict[str, Any]], iteration_count: int) -> PolicyAction:
         """
-        Queries Ollama to decide the next action.
+        Queries Ollama to decide the next action and validates the result.
         """
         # Format tools description
         tools_str = ""
@@ -101,9 +305,10 @@ class PolicyAgent:
         logger.info(f"[Policy Agent] Querying LLM on iteration {iteration_count}...")
         
         try:
-            response = requests.post(
+            from app.utils.async_http import async_post_json
+            status_code, data, text = await async_post_json(
                 f"{OLLAMA_URL}/api/generate",
-                json={
+                payload={
                     "model": self.model_name,
                     "prompt": system_prompt + "\n" + prompt,
                     "stream": False,
@@ -113,41 +318,38 @@ class PolicyAgent:
                         "temperature": 0.0
                     }
                 },
-                timeout=12
+                timeout=5.0
             )
 
-            if response.status_code == 200:
-                raw_text = response.json().get("response", "").strip()
-                cleaned_text = self._sanitize_json_string(raw_text)
-                try:
-                    data = json.loads(cleaned_text)
-                    # Normalize actions / check inputs
-                    if data.get("action") == "finish" and not data.get("answer"):
-                        data["answer"] = "No detailed information was found."
-                    
-                    action = PolicyAction(**data)
-                    logger.info(f"[Policy Agent] Decided action: {action.action} (Thought: {action.thought})")
-                    return action
-                except (json.JSONDecodeError, ValidationError) as parse_err:
-                    logger.warning(f"[Policy Agent] Malformed LLM response: {raw_text}. Error: {parse_err}")
+            if status_code == 200:
+                raw_text = data.get("response", "").strip()
+                action = parse_and_validate_policy_action(raw_text, tools)
+                logger.info(f"[Policy Agent] Decided action: {action.action} (Valid: {action.is_valid}, Thought: {action.thought})")
+                return action
             else:
-                logger.warning(f"[Policy Agent] Ollama returned status code: {response.status_code}")
+                logger.warning(f"[Policy Agent] Ollama returned status code: {status_code}")
         except Exception as e:
             logger.error(f"[Policy Agent Exception] Ollama query failed: {e}")
 
         # Safe Fallback: Finish with local retrieval if possible, or simple search
         logger.info("[Policy Agent] Using fallback default action")
         if iteration_count == 1:
-            return PolicyAction(
+            fallback = PolicyAction(
                 action="tool",
                 tool="search_live_news",
                 arguments={"query": query, "limit": 10},
-                thought="Ollama failed or is offline. Falling back to search_live_news tool."
+                thought="Ollama failed or is offline. Falling back to search_live_news tool.",
+                is_valid=True
             )
         else:
-            return PolicyAction(
+            fallback = PolicyAction(
                 action="finish",
-                answer="",
-                thought="Encountered an exception. Synthesizing answer from retrieved observations."
+                # Use sentinel that triggers reflection_node's local synthesizer
+                # which will produce a proper executive briefing from retrieved observations.
+                answer="No detailed information was found.",
+                thought="Ollama offline. Routing to local synthesis from retrieved observations.",
+                is_valid=True
             )
+        return parse_and_validate_policy_action(fallback, tools)
+
 

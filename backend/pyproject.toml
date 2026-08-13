@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "unit: Unit tests running fully offline with mocks/fakes and zero external dependencies",
+    "integration: Deterministic integration tests proving workflow loops with mock LLM/MCP boundaries",
+    "live: Optional live integration tests requiring actual running services (Ollama, Redis, network)"
+]
+addopts = "-m \"not live\""

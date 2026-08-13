@@ -52,15 +52,49 @@ class NewsPipelineScheduler:
                 embedding = await self.embedding_agent.run(cleaned_text)
                 article.embedding = embedding
                 
-                # 6. Duplicate Detection
-                # Mock existing embeddings from DB
-                mock_existing = [] 
-                is_duplicate, _ = await self.duplicate_agent.run(embedding, mock_existing)
+                # 6. Duplicate Detection using real stored embeddings from repository
+                from app.repositories.news_repository import news_repository
+                from app.database.mongodb import mongodb_manager
+                from app.database.qdrant import qdrant_manager
+
+                existing_embeddings = news_repository.get_all_embeddings()
+                is_duplicate, _ = await self.duplicate_agent.run(embedding, existing_embeddings)
                 article.is_duplicate = is_duplicate
                 
                 if not is_duplicate:
-                    logger.info(f"New unique article: {article.title}. Ready for DB insertion.")
-                    # TODO: Insert to MongoDB and Qdrant
+                    logger.info(f"New unique article: {article.title}. Persisting to repositories...")
+                    import hashlib
+                    raw_id = getattr(article, "id", None)
+                    art_id = raw_id if isinstance(raw_id, str) and raw_id else f"art_{hashlib.md5(str(article.title).encode('utf-8')).hexdigest()[:12]}"
+                    art_source = str(getattr(article, "source", "Scheduled RSS Feed"))
+                    art_url = str(getattr(article, "url", "#"))
+                    art_content = str(getattr(article, "content", cleaned_text))
+
+                    article_dict = {
+                        "id": art_id,
+                        "title": str(article.title),
+                        "content": art_content,
+                        "cleaned_content": str(cleaned_text),
+                        "source": art_source,
+                        "url": art_url,
+                        "category": str(category),
+                        "chunks": chunks if isinstance(chunks, list) else [str(chunks)],
+                        "embedding": embedding if isinstance(embedding, list) else []
+                    }
+                    # Persist to Primary JSON Store
+                    news_repository.articles.append(article_dict)
+                    news_repository._save_to_disk()
+
+                    # Persist to MongoDB (if connected)
+                    await mongodb_manager.insert_article(article_dict)
+
+                    # Persist to Qdrant Vector Store (if connected)
+                    if embedding:
+                        qdrant_manager.upsert_article(
+                            article_id=article_dict["id"],
+                            vector=embedding,
+                            payload={"title": article_dict["title"], "url": article_dict["url"], "category": category}
+                        )
                 else:
                     logger.info(f"Article is duplicate: {article.title}. Skipping.")
                     

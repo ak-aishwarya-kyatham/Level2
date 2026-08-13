@@ -26,10 +26,11 @@ class NewsIntelMCPClient:
             return
         
         logger.info("Starting MCP Server subprocess and establishing session...")
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         server_params = StdioServerParameters(
             command=sys.executable,
             args=["-u", "-m", "app.mcp_server"],
-            env={**os.environ, "PYTHONPATH": os.getcwd()}
+            env={**os.environ, "PYTHONPATH": backend_dir}
         )
         
         self._exit_stack = AsyncExitStack()

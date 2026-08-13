@@ -18,5 +18,7 @@ passlib
 bcrypt
 mcp
 feedparser
+pytest
+pytest-asyncio
 
 

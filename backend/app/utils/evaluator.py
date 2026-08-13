@@ -71,6 +71,127 @@ def calculate_dataset_routing_accuracy(actual_tool_selections: List[Dict[str, st
     return round(correct / evaluated, 4)
 
 
+async def run_routing_benchmark(
+    dataset: Optional[List[Dict[str, str]]] = None,
+    policy_agent: Optional[Any] = None,
+    tools: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """
+    Executes the actual Policy Agent for each labeled query in routing_dataset.json,
+    records the selected tool, compares against ground-truth expected_tool,
+    and calculates Routing Accuracy, Coverage, Confusion Matrix, and detailed results.
+
+    NO keyword inference or if/elif routing — expected tool comes strictly from dataset,
+    and actual tool comes strictly from PolicyAgent execution.
+    """
+    from app.agents.policy_agent import PolicyAgent
+    agent = policy_agent or PolicyAgent()
+    eval_data = dataset if dataset is not None else GROUND_TRUTH_DATASET
+
+    if not eval_data:
+        return {
+            "routing_accuracy": 0.0,
+            "coverage": 0.0,
+            "total_queries": 0,
+            "evaluated_queries": 0,
+            "correct_selections": 0,
+            "incorrect_selections": 0,
+            "confusion_matrix": {},
+            "details": []
+        }
+
+    if tools is None:
+        tools = [
+            {
+                "name": "search_live_news",
+                "description": "Search live news articles, location trends, or topic news",
+                "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}}
+            },
+            {
+                "name": "compare_news_sources",
+                "description": "Compare coverage between two media outlets",
+                "inputSchema": {"type": "object", "properties": {"source1": {"type": "string"}, "source2": {"type": "string"}}, "required": ["source1", "source2"]}
+            },
+            {
+                "name": "get_dashboard_analytics",
+                "description": "Retrieve overall global system statistics and high-level platform analytics",
+                "inputSchema": {"type": "object", "properties": {}}
+            }
+        ]
+
+    details = []
+    correct_count = 0
+    confusion_matrix: Dict[str, Dict[str, int]] = {}
+
+    for item in eval_data:
+        query = item.get("query", "").strip()
+        expected_tool = item.get("expected_tool", "").strip()
+
+        if expected_tool not in confusion_matrix:
+            confusion_matrix[expected_tool] = {}
+
+        # Execute actual Policy Agent decision
+        try:
+            action = await agent.decide_action(
+                query=query,
+                tools=tools,
+                history=[],
+                iteration_count=1
+            )
+            actual_tool = action.tool if (action.action == "tool" and action.tool) else "finish"
+        except Exception:
+            actual_tool = "error"
+
+        is_correct = (actual_tool == expected_tool)
+        if is_correct:
+            correct_count += 1
+
+        confusion_matrix[expected_tool][actual_tool] = confusion_matrix[expected_tool].get(actual_tool, 0) + 1
+
+        details.append({
+            "query": query,
+            "expected_tool": expected_tool,
+            "actual_tool": actual_tool,
+            "correct": is_correct
+        })
+
+    total_queries = len(eval_data)
+    evaluated_queries = len(details)
+    incorrect_selections = evaluated_queries - correct_count
+    accuracy = round(correct_count / evaluated_queries, 4) if evaluated_queries > 0 else 0.0
+    coverage = round(evaluated_queries / total_queries, 4) if total_queries > 0 else 0.0
+
+    return {
+        "routing_accuracy": accuracy,
+        "coverage": coverage,
+        "total_queries": total_queries,
+        "evaluated_queries": evaluated_queries,
+        "correct_selections": correct_count,
+        "incorrect_selections": incorrect_selections,
+        "confusion_matrix": confusion_matrix,
+        "details": details
+    }
+
+
+def evaluate_routing_benchmark_sync(
+    dataset: Optional[List[Dict[str, str]]] = None,
+    policy_agent: Optional[Any] = None,
+    tools: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """Synchronous wrapper for run_routing_benchmark."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import nest_asyncio
+            nest_asyncio.apply()
+            return loop.run_until_complete(run_routing_benchmark(dataset, policy_agent, tools))
+        else:
+            return loop.run_until_complete(run_routing_benchmark(dataset, policy_agent, tools))
+    except Exception:
+        return asyncio.run(run_routing_benchmark(dataset, policy_agent, tools))
+
+
+
 # ---------------------------------------------------------------------------
 # Categorization F1 (Fix 3a) — uses actual CategorizationAgent
 # ---------------------------------------------------------------------------

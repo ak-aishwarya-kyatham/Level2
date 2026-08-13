@@ -115,6 +115,26 @@ async def policy_node(state: AgentState) -> AgentState:
         iteration_count=state["iteration_count"] + 1
     )
     
+    # 1. Validation Check: If LLM output failed Pydantic or MCP schema validation,
+    # record a structured observation detailing the validation failure and return to Policy Agent for re-decision.
+    if not decision.is_valid:
+        err_msg = decision.validation_error or "Unknown validation error."
+        logger.warning(f"[Workflow] Policy Agent produced invalid action/arguments: {err_msg}")
+        validation_obs = {
+            "iteration": state["iteration_count"] + 1,
+            "thought": decision.thought or "Policy Agent action failed schema validation.",
+            "tool": decision.tool or "invalid_action",
+            "arguments": decision.arguments or {},
+            "result": f"VALIDATION ERROR: {err_msg}",
+            "timestamp": time.time(),
+            "execution_time": 0.0
+        }
+        state["observations"].append(validation_obs)
+        state["iteration_count"] += 1
+        state["next_action"] = "policy"
+        state["agent_trace"].append(f"Validation Failure: {err_msg}")
+        return state
+
     # Safeguard 1: If LLM says "finish" but we have zero observations,
     # force a tool call so we always retrieve real data first.
     if decision.action == "finish" and len(state["observations"]) == 0:
@@ -126,9 +146,6 @@ async def policy_node(state: AgentState) -> AgentState:
 
     # Multi-tool support: if Policy Agent requests another tool after observations,
     # allow it — the agent decides when it has enough data.
-    # The only termination guards are:
-    #   a) The Policy Agent itself emits {"action": "finish"}
-    #   b) MAX_ITERATIONS safety check above
     if decision.action == "tool":
         obs_count = len(state["observations"])
         logger.info(f"[Workflow] Policy Agent selected tool '{decision.tool}' (observation #{obs_count + 1}).")
@@ -149,7 +166,9 @@ async def policy_node(state: AgentState) -> AgentState:
 # Conditional routing edge
 def route_policy(state: AgentState) -> str:
     action = state.get("next_action", "finish")
-    if action == "tool":
+    if action == "policy":
+        return "policy"
+    elif action == "tool":
         return "tool"
     return "reflection"
 
@@ -256,7 +275,7 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
                 if isinstance(item, dict):
                     title = item.get("title", "")
                     content = item.get("cleaned_content") or item.get("content") or item.get("description") or item.get("summary") or ""
-                    source = item.get("source", "")
+                    source = item.get("source") or "Live Media"
                     url = item.get("url", "#")
                     category = item.get("category", "")
                     published_date = item.get("published_date", "")
@@ -326,7 +345,7 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
                         if isinstance(item, dict):
                             title = item.get("title", "")
                             content = item.get("cleaned_content") or item.get("content") or item.get("description") or item.get("summary") or ""
-                            source = item.get("source", "")
+                            source = item.get("source") or "Live Media"
                             url = item.get("url", "#")
                             category = item.get("category", "")
                             published_date = item.get("published_date", "")
@@ -344,13 +363,15 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
     if not articles:
         # Extract title from query quotes if available
         quoted_title = re.findall(r'["\u201c\u201d]([^"\u201c\u201d]+)["\u201c\u201d]', query)
+        if not quoted_title:
+            quoted_title = re.findall(r"['\u2018\u2019]([^'\u2018\u2019]+)['\u2018\u2019]", query)
         if quoted_title:
             t = quoted_title[0]
             articles = [{
                 "title": t,
                 "content": t,
                 "cleaned_content": t,
-                "source": "Verified News Outlet",
+                "source": "Live Media",
                 "url": "#",
                 "category": "General News",
                 "published_date": ""
@@ -374,18 +395,29 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
 
 # Reflection node
 async def reflection_node(state: AgentState) -> AgentState:
+    from app.agents.reflection_agent import REFLECTION_STATUS_UNVERIFIED, REFLECTION_STATUS_REVISED
     query = state["query"]
     answer = state.get("action_answer", "")
     history = state.get("observations", [])
-    
+
     # Run reflection
     report = await reflection_agent.reflect(query=query, answer=answer, history=history)
     state["reflection_report"] = report.dict()
-    
+
+    reflection_status = report.reflection_status
+    fallback_used     = report.fallback_used
+
     if report.revise and state.get("iteration_count", 0) < 4:
-        # Loop back to Policy Agent by setting action to tool (or keep looping)
-        logger.info("[Workflow] Reflection agent requested a revision.")
-        state["agent_trace"].append(f"Critique: Revision requested. Unsupported: {report.unsupported_claims}")
+        # Loop back to Policy Agent for revision
+        logger.info(
+            f"[Workflow] Reflection agent requested revision. "
+            f"Status={reflection_status}, Fallback={fallback_used}, "
+            f"Unsupported={report.unsupported_claims}"
+        )
+        state["agent_trace"].append(
+            f"Critique: Revision requested (status={reflection_status}). "
+            f"Unsupported: {report.unsupported_claims}"
+        )
         state["iteration_count"] = state.get("iteration_count", 0) + 1
         state["next_action"] = "tool"  # Forces workflow to loop back
         # Append critique to history so Policy Agent is aware
@@ -394,17 +426,22 @@ async def reflection_node(state: AgentState) -> AgentState:
             "thought": "Reflection criticism",
             "tool": "reflection_critique",
             "arguments": {},
-            "result": f"Please revise the response. Critique: Unsupported claims: {report.unsupported_claims}. Missing: {report.missing_information}",
+            "result": (
+                f"Please revise the response. "
+                f"Reflection status: {reflection_status}. "
+                f"Unsupported claims: {report.unsupported_claims}. "
+                f"Missing: {report.missing_information}"
+            ),
             "timestamp": time.time(),
             "execution_time": 0.0
         })
     else:
-        resp_str = answer
+        resp_str  = answer
         retrieved = state.get("retrieved_documents", [])
-        
+
         # Check if LLM output is generic, missing, single-line, or contains an empty Key Summary template
-        is_raw_list = bool(resp_str and resp_str.startswith("Summary:") and len(resp_str.split("\n")) <= 2)
-        is_generic = bool(not resp_str or resp_str in ["No response generated.", "No detailed information was found."])
+        is_raw_list    = bool(resp_str and resp_str.startswith("Summary:") and len(resp_str.split("\n")) <= 2)
+        is_generic     = bool(not resp_str or resp_str in ["No response generated.", "No detailed information was found."])
         is_blank_summary = bool(resp_str and re.search(r'\*\*Key Summary:\*\*\s*(?:---|#|\*\*Primary Source Links:\*\*|\s*$)', resp_str))
 
         if (is_generic or is_raw_list or is_blank_summary) and (history or retrieved):
@@ -415,9 +452,33 @@ async def reflection_node(state: AgentState) -> AgentState:
             else:
                 resp_str = _synthesize_from_observations(query, history, intent=state.get("intent", ""))
 
-
         if not resp_str:
             resp_str = "No response generated."
+
+        # ----------------------------------------------------------------
+        # FAIL-SAFE: If reflection could not verify the answer, attach a
+        # clear UNVERIFIED disclaimer. NEVER suppress this silently.
+        # ----------------------------------------------------------------
+        if reflection_status == REFLECTION_STATUS_UNVERIFIED or fallback_used:
+            unverified_note = (
+                "\n\n---\n"
+                "> ⚠️ **UNVERIFIED**: The Reflection Agent could not fully verify this response "
+                "against retrieved sources (LLM verification was unavailable). "
+                "Claims have been checked deterministically against observations, "
+                "but independent verification is recommended."
+            )
+            if report.unsupported_claims:
+                unverified_note += (
+                    f"\n> **Potentially unverified claims**: {'; '.join(report.unsupported_claims[:3])}"
+                )
+            resp_str += unverified_note
+            logger.warning(
+                f"[Workflow] Reflection UNVERIFIED — disclaimer appended to final response. "
+                f"Fallback={fallback_used}, Unsupported={len(report.unsupported_claims)}"
+            )
+            state["agent_trace"].append(
+                f"Reflection UNVERIFIED (fallback={fallback_used}). Disclaimer added to response."
+            )
 
         state["final_response"] = resp_str
 
@@ -448,8 +509,9 @@ async def reflection_node(state: AgentState) -> AgentState:
         # Override cache_hit_rate with actual dynamic value from Redis counters
         metrics["cache_hit_rate"] = get_cache_hit_rate()
         state["evaluation_metrics"] = metrics
-        state["agent_trace"].append("Reflection complete. Finalizing response.")
-
+        state["agent_trace"].append(
+            f"Reflection complete. Status={reflection_status}. Finalizing response."
+        )
 
     return state
 
@@ -465,7 +527,7 @@ graph.add_node("reflection", reflection_node)
 # Add edges
 graph.set_entry_point("cache")
 graph.add_conditional_edges("cache", should_use_cache, {"end": END, "policy": "policy"})
-graph.add_conditional_edges("policy", route_policy, {"tool": "tool", "reflection": "reflection"})
+graph.add_conditional_edges("policy", route_policy, {"tool": "tool", "reflection": "reflection", "policy": "policy"})
 graph.add_edge("tool", "policy")
 graph.add_conditional_edges("reflection", lambda state: "policy" if state.get("next_action") == "tool" else "end", {
     "policy": "policy",

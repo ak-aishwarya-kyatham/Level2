@@ -8,17 +8,26 @@ from app.mcp_client import mcp_client
 
 from contextlib import asynccontextmanager
 
+from app.utils.task_lifecycle import task_manager
+
 logger = logging.getLogger("uvicorn")
 
 async def periodic_news_fetcher():
     """Background task to continuously poll RSS feeds every 5 minutes via MCP Tool."""
-    while True:
-        try:
-            logger.info("[MCP Background Worker] Triggering periodic live RSS news fetch via MCP...")
-            await mcp_client.call_tool("fetch_latest_rss_feeds")
-        except Exception as e:
-            logger.error(f"[MCP Background Worker Error]: {e}")
-        await asyncio.sleep(300)
+    try:
+        while True:
+            try:
+                logger.info("[MCP Background Worker] Triggering periodic live RSS news fetch via MCP...")
+                await mcp_client.call_tool("fetch_latest_rss_feeds")
+            except asyncio.CancelledError:
+                logger.info("[MCP Background Worker] Cancellation requested.")
+                raise
+            except Exception as e:
+                logger.error(f"[MCP Background Worker Error]: {e}")
+            await asyncio.sleep(300)
+    except asyncio.CancelledError:
+        logger.info("[MCP Background Worker] Task cleanly shut down.")
+        raise
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,12 +36,15 @@ async def lifespan(app: FastAPI):
     tools = await mcp_client.list_available_tools()
     logger.info(f"Registered MCP Tools: {tools}")
     
-    # Fetch immediately on startup via MCP tool
-    asyncio.create_task(mcp_client.call_tool("fetch_latest_rss_feeds"))
-    # Start continuous background fetcher
-    asyncio.create_task(periodic_news_fetcher())
+    # Register and track startup background tasks via task_manager
+    task_manager.create_task(mcp_client.call_tool("fetch_latest_rss_feeds"), name="startup_rss_fetch")
+    task_manager.create_task(periodic_news_fetcher(), name="periodic_news_fetcher")
     yield
+    
+    logger.info("Application shutdown initiated. Cancelling background tasks...")
+    await task_manager.cancel_all()
     await mcp_client.stop()
+    logger.info("Application shutdown complete.")
 
 
 app = FastAPI(

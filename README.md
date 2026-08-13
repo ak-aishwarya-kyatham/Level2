@@ -48,10 +48,10 @@ graph TD
 
 ## 🛠️ Technology Stack
 
-* **Backend API**: FastAPI, Python 3.11, Uvicorn
+* **Backend API**: FastAPI, Python 3.11+, Uvicorn
 * **Frontend UI**: React, TypeScript, Vite, Tailwind CSS, Lucide Icons
 * **Multi-Agent Orchestration**: LangGraph, LangChain
-* **AI & Embedding Models**: Ollama (Qwen2.5 local model), HuggingFace (Transformers)
+* **AI & Embedding Models**: Ollama (`qwen2.5:3b` local model), HuggingFace Transformers
 * **API Protocol Layer**: Model Context Protocol (MCP) Server & Client (via `mcp` SDK)
 * **Databases (Multi-Tier)**:
   * **MongoDB** (Stored article metadata)
@@ -68,7 +68,7 @@ You can run the entire frontend and backend directly on your host machine. The b
 ### Prerequisites
 * **Node.js** (v20 or higher)
 * **Python** (v3.11 or higher)
-* **Ollama** (Running locally with `qwen2.5:3b` pulled: `ollama run qwen2.5:3b`)
+* **Ollama** (Optional for live LLM routing & reflection: `ollama run qwen2.5:3b`)
 
 ### 1. Set Up and Run the Backend
 1. Open a terminal and navigate to the backend folder:
@@ -110,6 +110,81 @@ You can run the entire frontend and backend directly on your host machine. The b
    ```
    *The frontend will be live at `http://localhost:5173`.*
 
+---
+
+## 🧪 Testing & Quality Assurance
+
+### Exact Test Commands
+To run the standard offline test suite (excluding live external service dependencies), navigate to the `backend/` directory and execute:
+
+```bash
+# Standard Offline Suite (Runs Unit + Deterministic Integration Tests)
+python -m pytest -q
+```
+
+To run specific test categories independently:
+
+```bash
+# Category 1: Unit Tests Only (Mocks/Fakes, Zero External Services)
+python -m pytest -m unit -q
+
+# Category 2: Deterministic Integration Tests Only (Fake LLM/MCP boundaries)
+python -m pytest -m integration -q
+
+# Category 3: Optional Live Tests (Requires Running Ollama on http://localhost:11434)
+python -m pytest -m live -q
+```
+
+*(Current Standard Test Suite Status: **67 / 67 Passed**, Live Tests: **1 Marked Live**)*
+
+### Test Dependencies
+The test suite requires the following Python dependencies (installed via `requirements.txt`):
+* `pytest` & `pytest-asyncio`
+* `fastapi` & `starlette`
+* `langgraph` & `langchain`
+* `pydantic` & `httpx`
+* `requests`
+
+### Test Categorization Architecture
+1. **Category 1 — Unit Tests (`@pytest.mark.unit`)**: Test isolated components, utility functions, schemas, text cleaners, Policy action parsers, and caching logic without external services or network calls (`tests/test_api.py`, `tests/test_policy_action_validation.py`, `tests/test_cache.py`).
+2. **Category 2 — Deterministic Integration Tests (`@pytest.mark.integration`)**: Prove Policy Agent decisions, multi-step loops, observation history propagation, finish actions, Reflection Agent validation, revision loops, and evaluation metrics using deterministic LLM/MCP mock boundaries (`tests/test_agentic_loop.py`, `tests/test_evaluation.py`, `tests/test_latency_cache.py`, `tests/test_briefing_pipeline.py`, `tests/test_reflection_agent.py`).
+3. **Category 3 — Optional Live Tests (`@pytest.mark.live`)**: Test end-to-end LLM inference against an actual running Ollama server (`http://localhost:11434`). Configured in `pyproject.toml` (`addopts = "-m \"not live\""`) so normal test runs do not require external services (`test_live_ollama_integration` in `tests/test_agentic_loop.py`).
+
+---
+
+## ⚡ Core Architectural Features & Benchmarks
+
+### 1. Genuine Multi-Step Agentic Loop (`backend/app/workflows/main_workflow.py`)
+* Implements an iterative `Decide → Act → Observe → Reflect` LangGraph state machine.
+* Supports up to `MAX_ITERATIONS = 5` sequential tool invocations (e.g. `search_live_news` followed by `get_dashboard_analytics`) before finalizing responses.
+* **Policy Agent Trace & Evidence**: Multi-tool execution traces record exact step arguments, execution timestamps, and tool observations into `AgentState["observations"]`.
+
+### 2. Ground-Truth Routing Accuracy Benchmark (`backend/app/utils/evaluator.py` & `backend/app/utils/routing_dataset.json`)
+* Evaluates Policy Agent decisions against explicitly labeled `{query, expected_tool}` pairs in `routing_dataset.json`.
+* **Zero Keyword Inference**: Expected tools are read exclusively from ground-truth data, and actual tools are obtained strictly by executing `PolicyAgent.decide_action()`.
+
+### 3. Reflection Agent & Conservative Fallback (`backend/app/agents/reflection_agent.py`)
+* **LLM Reflection**: Compares generated summaries against retrieved observation tokens to classify claims (`VERIFIED` vs `REVISED`).
+* **Deterministic Fallback**: If Ollama is offline or times out, the Reflection Agent executes `_extract_observation_tokens()` to verify grounding. Unconfirmed claims are flagged as `UNVERIFIED` in the response header to ensure transparency.
+
+### 4. Real Latency & Redis Cache-Hit Measurement (`backend/app/workflows/main_workflow.py` & `backend/app/utils/redis_cache.py`)
+* **Real Latency**: Captured using high-precision `time.perf_counter()` starting at request entry and ending upon final state generation.
+* **Redis Cache Hit/Miss**: Uses SHA-256 query digest keys (`newsintel:query:<sha256>`). On a hit, returns cached response with `cache_hit: True` and zero latency overhead.
+
+---
+
+## 📊 Evaluation Metrics Glossary
+
+Each metric reported by `evaluate_execution()` is defined as follows:
+
+| Metric | What It Measures | How It Is Calculated | Data Used |
+| :--- | :--- | :--- | :--- |
+| **Precision@5** | Quality of top 5 RAG search results | `relevant_docs_in_top_5 / min(5, total_docs)` | Keyword overlap between query and retrieved document titles/content |
+| **MRR@10** | Reciprocal rank of the first relevant result in top 10 | `1 / first_relevant_rank` (or `0.0` if none) | Document position in top 10 search results |
+| **Faithfulness** | Proportion of generated summary claims supported by sources | `matching_summary_tokens / total_summary_tokens` | Token overlap between generated answer and retrieved source text |
+| **Routing Accuracy** | Policy Agent tool selection accuracy | `correct_selections / evaluated_queries` | Policy Agent output vs ground-truth labels in `routing_dataset.json` |
+| **Categorization F1** | Categorization accuracy across news classes | Macro F1 score across all categories | CategorizationAgent predictions vs labels in `categorization_eval_dataset.json` |
+| **Deduplication Recall** | Duplicate article detection performance | `true_positives / (true_positives + false_negatives)` | DuplicateDetectorAgent output vs pairs in `deduplication_eval_dataset.json` |
 
 ---
 
@@ -127,32 +202,3 @@ The backend implements the Model Context Protocol (MCP) server that exposes the 
 ### Exposed Resources
 * `news://store/articles`: Retrieve all active stored news articles.
 * `news://analytics/metrics`: Access platform analytics and entity distribution metrics.
-
----
-
-## ⚡ Core Implementations & Benchmarks
-
-The platform incorporates 4 key architectural features:
-
-1. **Genuine Multi-Step Agentic Loop (`main_workflow.py`):**
-   - Implements an iterative `Decide → Act → Observe → Reflect` LangGraph state machine.
-   - Allows up to `MAX_ITERATIONS = 5` sequential tool invocations (e.g. `search_live_news` followed by `get_dashboard_analytics`) before finalizing responses.
-
-2. **Ground-Truth Routing Accuracy Evaluation (`evaluator.py` & `routing_dataset.json`):**
-   - Replaced naive keyword matching with a ground-truth benchmark dataset (`routing_dataset.json`).
-   - Evaluates LLM policy routing decisions against 10 explicit `{query, expected_tool}` pairs.
-
-3. **Dynamic Evaluation Metrics Engine (`evaluator.py`):**
-   - Replaced all hardcoded metric sentinels (`categorization_f1 = 0.85`, `deduplication_recall = 1.0`).
-   - Measures real-time macro/micro F1 categorization performance on [`categorization_eval_dataset.json`](file:///c:/Users/AishwaryaK/Desktop/agent/backend/app/utils/categorization_eval_dataset.json) and deduplication recall on [`deduplication_eval_dataset.json`](file:///c:/Users/AishwaryaK/Desktop/agent/backend/app/utils/deduplication_eval_dataset.json).
-
-4. **Production-Grade Redis Caching (`redis_cache.py`):**
-   - Integrates SHA-256 query digest hashing (`newsintel:query:<sha256>`) with configurable TTL (`CACHE_TTL_SECONDS`).
-   - Tracks dynamic hit/miss metrics in real time with fast offline connection fallbacks (`socket_connect_timeout=0.2s`).
-
-5. **Real End-to-End Latency & Dynamic Cache-Hit State Propagation (`main_workflow.py`, `evaluator.py`, `test_latency_cache.py`):**
-   - Replaced artificial timing offsets (`time.time() - 2.0`) with high-precision `time.perf_counter()` captured once at request entry and measured across the complete multi-step workflow.
-   - Dynamically detects and propagates actual Redis GET HIT/MISS boolean state (`cache_hit: True/False`) into `AgentState` and passes real runtime timing to `evaluate_execution()`.
-   - Validated by 6 automated tests in [`test_latency_cache.py`](file:///c:/Users/AishwaryaK/Desktop/agent/backend/tests/test_latency_cache.py) (48/48 total backend tests passing).
-
-
