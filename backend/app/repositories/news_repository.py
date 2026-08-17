@@ -22,6 +22,8 @@ class NewsRepository:
         self.ingestion_agent = IngestionAgent()
         self.cleaning_agent = CleaningAgent()
         self.categorization_agent = CategorizationAgent()
+        self.evaluation_runs: List[Dict[str, Any]] = []
+        self.agent_execution_logs: List[Dict[str, Any]] = []
         self.duplicates_prevented = 0
         self._stats_cache: Optional[Dict[str, Any]] = None  # Cluster cache
 
@@ -39,6 +41,7 @@ class NewsRepository:
             logger.info("[Redis Cache] Redis server offline. Operating in-memory cache mode.")
 
         self._load_from_disk()
+        self._load_evaluations_from_disk()
 
     def get_all_embeddings(self) -> List[List[float]]:
         """Returns all stored article embeddings for duplicate detection comparison."""
@@ -68,6 +71,64 @@ class NewsRepository:
                 json.dump(self.articles, f, indent=2, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Failed to save articles to disk: {e}")
+
+    def _load_evaluations_from_disk(self):
+        eval_file = os.getenv("EVAL_DATA_FILE") or os.path.join(os.path.dirname(__file__), "..", "data", "evaluation_runs_store.json")
+        logs_file = os.getenv("AGENT_LOGS_DATA_FILE") or os.path.join(os.path.dirname(__file__), "..", "data", "agent_execution_logs.json")
+        if os.path.exists(eval_file):
+            try:
+                with open(eval_file, "r", encoding="utf-8") as f:
+                    self.evaluation_runs = json.load(f)
+            except Exception:
+                self.evaluation_runs = []
+        if os.path.exists(logs_file):
+            try:
+                with open(logs_file, "r", encoding="utf-8") as f:
+                    self.agent_execution_logs = json.load(f)
+            except Exception:
+                self.agent_execution_logs = []
+
+    def _save_evaluations_to_disk(self):
+        eval_file = os.getenv("EVAL_DATA_FILE", os.path.join(os.path.dirname(__file__), "..", "data", "evaluation_runs_store.json"))
+        try:
+            os.makedirs(os.path.dirname(eval_file), exist_ok=True)
+            with open(eval_file, "w", encoding="utf-8") as f:
+                json.dump(self.evaluation_runs, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Failed to save evaluation runs to disk: {e}")
+
+    def _save_agent_logs_to_disk(self):
+        logs_file = os.getenv("AGENT_LOGS_DATA_FILE", os.path.join(os.path.dirname(__file__), "..", "data", "agent_execution_logs.json"))
+        try:
+            os.makedirs(os.path.dirname(logs_file), exist_ok=True)
+            with open(logs_file, "w", encoding="utf-8") as f:
+                json.dump(self.agent_execution_logs, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Failed to save agent logs to disk: {e}")
+
+    def record_evaluation_run(self, run_data: Dict[str, Any]):
+        """Records actual execution evaluation metrics produced by evaluator.py."""
+        if not isinstance(run_data, dict):
+            return
+        run_entry = {
+            "run_id": run_data.get("run_id") or f"run_{int(datetime.utcnow().timestamp() * 1000)}",
+            "timestamp": run_data.get("timestamp") or datetime.utcnow().isoformat(),
+            "query": run_data.get("query", ""),
+            "metrics": run_data.get("metrics", {})
+        }
+        self.evaluation_runs.append(run_entry)
+        self._save_evaluations_to_disk()
+
+    def record_agent_execution(self, agent: str, latency_ms: float, success: bool):
+        """Records actual agent tool execution timing and success/failure status."""
+        log_entry = {
+            "agent": agent,
+            "latency_ms": round(float(latency_ms), 1),
+            "success": bool(success),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        self.agent_execution_logs.append(log_entry)
+        self._save_agent_logs_to_disk()
 
     def _generate_id(self, url: str, title: str) -> str:
         unique_str = f"{url}_{title}"
@@ -445,6 +506,7 @@ class NewsRepository:
 
 
     def get_analytics_metrics(self) -> Dict[str, Any]:
+        self._load_evaluations_from_disk()
         total = len(self.articles)
         # Reuse shared breakdown helper — avoids duplicate O(n) loop
         sources_count, categories_count = self._compute_breakdowns()
@@ -540,13 +602,40 @@ class NewsRepository:
         ]
 
 
-        agent_performance = [
-            {"agent": "Ingestion Agent (RSS & Web)", "avg_latency_ms": 142, "success_rate": 100.0},
-            {"agent": "Cleaning & Sanitizer Agent", "avg_latency_ms": 38, "success_rate": 99.8},
-            {"agent": "Categorization Agent", "avg_latency_ms": 52, "success_rate": 98.6},
-            {"agent": "Duplicate Detection Agent", "avg_latency_ms": 85, "success_rate": 99.2},
-            {"agent": "RAG Search & Retrieval Agent", "avg_latency_ms": 120, "success_rate": 99.5},
+        # Dynamic Agent Performance derived strictly from actual execution logs
+        agent_names = [
+            "Ingestion Agent (RSS & Web)",
+            "Cleaning & Sanitizer Agent",
+            "Categorization Agent",
+            "Duplicate Detection Agent",
+            "RAG Search & Retrieval Agent",
         ]
+
+        agent_performance = []
+        for agent_name in agent_names:
+            logs = [l for l in self.agent_execution_logs if l.get("agent") == agent_name]
+            if logs:
+                avg_lat = round(sum(l["latency_ms"] for l in logs) / len(logs), 1)
+                succ_rate = round((sum(1 for l in logs if l.get("success")) / len(logs)) * 100, 1)
+                agent_performance.append({
+                    "agent": agent_name,
+                    "avg_latency_ms": avg_lat,
+                    "success_rate": succ_rate,
+                    "status": "OPERATIONAL" if succ_rate >= 90.0 else "DEGRADED",
+                    "execution_count": len(logs),
+                    "source": "Actual Execution Logs",
+                    "calculation": f"mean(latency_ms)={avg_lat}ms, (successes/total)*100={succ_rate}% over {len(logs)} run(s)"
+                })
+            else:
+                agent_performance.append({
+                    "agent": agent_name,
+                    "avg_latency_ms": None,
+                    "success_rate": None,
+                    "status": "UNAVAILABLE",
+                    "execution_count": 0,
+                    "source": "Actual Execution Logs",
+                    "calculation": "No execution runs logged yet"
+                })
 
         # Word length metrics
         word_ranges = {"1-100 Words": 0, "101-300 Words": 0, "301-600 Words": 0, "601+ Words": 0}
@@ -566,70 +655,168 @@ class NewsRepository:
             for r, cnt in word_ranges.items()
         ]
 
-        # Dynamic System Evaluation Benchmark Suite
-        evaluation_metrics = [
+        # Dynamic System Evaluation Benchmark Suite derived from evaluator.py runs
+        from app.utils.redis_cache import get_cache_hit_rate
+        live_cache_hit_rate = get_cache_hit_rate()
+
+        metrics_specs = [
             {
                 "name": "Precision@5",
                 "metric_key": "precision_at_5",
-                "score": 0.85,
-                "percentage": 85.0,
                 "target": ">= 60.0%",
-                "status": "PASSED",
+                "target_val": 60.0,
                 "category": "Retrieval Quality",
-                "description": "Measures top-5 vector search retrieval quality & relevance accuracy across RAG queries."
+                "description": "Measures top-5 vector search retrieval quality & relevance accuracy across RAG queries.",
+                "source": "Actual RAG Execution (evaluator.py)",
+                "calculation": "average(precision_at_5) over evaluated runs"
             },
             {
-                "name": "Faithfulness & Groundedness",
+                "name": "MRR@10",
+                "metric_key": "mrr_at_10",
+                "target": ">= 70.0%",
+                "target_val": 70.0,
+                "category": "Retrieval Quality",
+                "description": "Reciprocal rank of the first relevant retrieved document in top-10 search results.",
+                "source": "Actual RAG Execution (evaluator.py)",
+                "calculation": "average(mrr_at_10) over evaluated runs"
+            },
+            {
+                "name": "Faithfulness",
                 "metric_key": "faithfulness",
-                "score": 0.96,
-                "percentage": 96.0,
                 "target": ">= 80.0%",
-                "status": "PASSED",
+                "target_val": 80.0,
                 "category": "RAG Integrity",
-                "description": "Verification checking that generated responses contain zero ungrounded factual hallucinations."
+                "description": "Verification checking that generated responses contain zero ungrounded factual claims.",
+                "source": "Actual RAG Execution (evaluator.py)",
+                "calculation": "average(faithfulness) over evaluated runs"
+            },
+            {
+                "name": "Groundedness",
+                "metric_key": "groundedness",
+                "target": ">= 80.0%",
+                "target_val": 80.0,
+                "category": "RAG Integrity",
+                "description": "Proportion of generated answer claims directly grounded in retrieved document tokens.",
+                "source": "Actual RAG Execution (evaluator.py)",
+                "calculation": "average(groundedness) over evaluated runs"
+            },
+            {
+                "name": "Answer Relevance",
+                "metric_key": "answer_relevance",
+                "target": ">= 75.0%",
+                "target_val": 75.0,
+                "category": "RAG Integrity",
+                "description": "Semantic overlap and intent alignment between user query prompt and generated answer.",
+                "source": "Actual RAG Execution (evaluator.py)",
+                "calculation": "average(answer_relevance) over evaluated runs"
             },
             {
                 "name": "Agent Routing Accuracy",
                 "metric_key": "routing_accuracy",
-                "score": 0.984,
-                "percentage": 98.4,
                 "target": ">= 90.0%",
-                "status": "PASSED",
+                "target_val": 90.0,
                 "category": "Workflow Triage",
-                "description": "Measures Triage Agent classification correctness in routing user prompts to specialized subagents."
+                "description": "Measures Policy Agent classification correctness against ground truth dataset.",
+                "source": "Actual Policy Agent Execution (evaluator.py)",
+                "calculation": "average(routing_accuracy) over evaluated runs"
             },
             {
                 "name": "End-to-End Latency",
-                "metric_key": "response_time",
-                "score": 0.44,
-                "value_text": "0.44s",
-                "percentage": 91.2,
+                "metric_key": "latency_seconds",
                 "target": "< 5.0s",
-                "status": "PASSED",
+                "target_val": 100.0,
                 "category": "System SLA",
-                "description": "Measures total request processing time from prompt entry to final workflow response."
+                "description": "Measures total request processing time from prompt entry to final workflow response.",
+                "source": "Actual Workflow Execution (main_workflow.py)",
+                "calculation": "average(latency_seconds) over evaluated runs"
+            },
+            {
+                "name": "Cache Hit Rate",
+                "metric_key": "cache_hit_rate",
+                "target": ">= 20.0%",
+                "target_val": 20.0,
+                "category": "System SLA",
+                "description": "Percentage of incoming user prompts served instantly from Redis cache.",
+                "source": "Actual Redis Cache (redis_cache.py)",
+                "calculation": "hits / (hits + misses) from active cache"
             },
             {
                 "name": "Deduplication Recall Rate",
                 "metric_key": "deduplication_recall",
-                "score": 0.992,
-                "percentage": 99.2,
                 "target": ">= 95.0%",
-                "status": "PASSED",
+                "target_val": 95.0,
                 "category": "Ingestion Hygiene",
-                "description": "Accuracy of vector distance thresholding & URL deduplication in preventing redundant media reporting."
+                "description": "Accuracy of vector distance thresholding & URL deduplication in preventing redundant media reporting.",
+                "source": "Actual Ingestion Benchmark (evaluator.py)",
+                "calculation": "average(deduplication_recall) over evaluated runs"
             },
             {
                 "name": "Categorization F1-Score",
-                "metric_key": "categorization_f1_score",
-                "score": 0.945,
-                "percentage": 94.5,
+                "metric_key": "categorization_f1",
                 "target": ">= 85.0%",
-                "status": "PASSED",
+                "target_val": 85.0,
                 "category": "Classification",
-                "description": "Macro F1-score of rule-based & LLM classifiers across all news categories."
+                "description": "Macro F1-score of rule-based & LLM classifiers across all news categories.",
+                "source": "Actual Categorization Evaluation (evaluator.py)",
+                "calculation": "average(categorization_f1) over evaluated runs"
             }
         ]
+
+        evaluation_metrics = []
+        runs_count = len(self.evaluation_runs)
+
+        for spec in metrics_specs:
+            key = spec["metric_key"]
+            if runs_count > 0:
+                vals = [r["metrics"][key] for r in self.evaluation_runs if "metrics" in r and key in r["metrics"] and r["metrics"][key] is not None]
+                if vals:
+                    avg_val = sum(vals) / len(vals)
+                    if key == "latency_seconds":
+                        avg_sec = round(avg_val, 2)
+                        score = round(avg_val, 3)
+                        pct = round(max(0.0, min(100.0, (1.0 - avg_sec / 5.0) * 100)), 1)
+                        value_text = f"{avg_sec}s"
+                        status = "PASSED" if avg_sec < 5.0 else "FAILED"
+                    else:
+                        score = round(avg_val, 3)
+                        pct = round(avg_val * 100, 1) if avg_val <= 1.0 else round(avg_val, 1)
+                        value_text = f"{pct}%"
+                        status = "PASSED" if pct >= spec["target_val"] else "FAILED"
+                    
+                    latest_run = self.evaluation_runs[-1]
+                    evaluation_metrics.append({
+                        "name": spec["name"],
+                        "metric_key": key,
+                        "score": score,
+                        "percentage": pct,
+                        "value_text": value_text,
+                        "target": spec["target"],
+                        "status": status,
+                        "category": spec["category"],
+                        "description": spec["description"],
+                        "source": spec["source"],
+                        "calculation": f"mean({key}) across {len(vals)} run(s)",
+                        "runs_count": len(vals),
+                        "latest_run_id": latest_run.get("run_id"),
+                        "timestamp": latest_run.get("timestamp")
+                    })
+                    continue
+
+            # Return null / UNAVAILABLE / N/A when no evaluation runs exist yet
+            evaluation_metrics.append({
+                "name": spec["name"],
+                "metric_key": key,
+                "score": None,
+                "percentage": None,
+                "value_text": "N/A",
+                "target": spec["target"],
+                "status": "UNAVAILABLE",
+                "category": spec["category"],
+                "description": spec["description"],
+                "source": spec["source"],
+                "calculation": "No evaluation run executed yet",
+                "runs_count": 0
+            })
 
         return {
             "categories": category_metrics,

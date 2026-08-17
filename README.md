@@ -122,7 +122,7 @@ To run the standard offline test suite (excluding live external service dependen
 python -m pytest -q
 ```
 
-To run specific test categories independently:
+To run specific test categories or deterministic workflow traces independently:
 
 ```bash
 # Category 1: Unit Tests Only (Mocks/Fakes, Zero External Services)
@@ -131,11 +131,14 @@ python -m pytest -m unit -q
 # Category 2: Deterministic Integration Tests Only (Fake LLM/MCP boundaries)
 python -m pytest -m integration -q
 
-# Category 3: Optional Live Tests (Requires Running Ollama on http://localhost:11434)
+# Category 3: Deterministic Full Agent Workflow Integration Test (Generates Trace Artifact)
+python -m pytest -v -s tests/test_full_agent_workflow.py
+
+# Category 4: Optional Live Ollama Integration Tests (Requires Running Ollama on http://localhost:11434)
 python -m pytest -m live -q
 ```
 
-*(Current Standard Test Suite Status: **67 / 67 Passed**, Live Tests: **1 Marked Live**)*
+*(Current Standard Test Suite Status: **87 / 87 Passed**, Live Tests: **1 Marked Live**, Total Collected: **88 Tests**)*
 
 ### Test Dependencies
 The test suite requires the following Python dependencies (installed via `requirements.txt`):
@@ -146,9 +149,61 @@ The test suite requires the following Python dependencies (installed via `requir
 * `requests`
 
 ### Test Categorization Architecture
-1. **Category 1 — Unit Tests (`@pytest.mark.unit`)**: Test isolated components, utility functions, schemas, text cleaners, Policy action parsers, and caching logic without external services or network calls (`tests/test_api.py`, `tests/test_policy_action_validation.py`, `tests/test_cache.py`).
-2. **Category 2 — Deterministic Integration Tests (`@pytest.mark.integration`)**: Prove Policy Agent decisions, multi-step loops, observation history propagation, finish actions, Reflection Agent validation, revision loops, and evaluation metrics using deterministic LLM/MCP mock boundaries (`tests/test_agentic_loop.py`, `tests/test_evaluation.py`, `tests/test_latency_cache.py`, `tests/test_briefing_pipeline.py`, `tests/test_reflection_agent.py`).
+1. **Category 1 — Unit Tests (`@pytest.mark.unit`)**: Test isolated components, module import compilation, utility functions, schemas, text cleaners, Policy action parsers, and caching logic without external services or network calls (`tests/test_api.py`, `tests/test_import_smoke.py`, `tests/test_policy_action_validation.py`, `tests/test_cache.py`, `tests/test_task_lifecycle.py`).
+2. **Category 2 — Deterministic Integration Tests (`@pytest.mark.integration`)**: Prove Policy Agent decisions, multi-step loops, observation history propagation, finish actions, Reflection Agent validation, revision loops, response synthesis grounding, dynamic evaluator persistence, and latency measurement using deterministic LLM/MCP mock boundaries (`tests/test_agentic_loop.py`, `tests/test_evaluation.py`, `tests/test_dynamic_metrics.py`, `tests/test_response_synthesis_grounding.py`, `tests/test_full_agent_workflow.py`, `tests/test_latency_cache.py`, `tests/test_briefing_pipeline.py`, `tests/test_reflection_agent.py`, `tests/test_persistence_scheduler.py`).
 3. **Category 3 — Optional Live Tests (`@pytest.mark.live`)**: Test end-to-end LLM inference against an actual running Ollama server (`http://localhost:11434`). Configured in `pyproject.toml` (`addopts = "-m \"not live\""`) so normal test runs do not require external services (`test_live_ollama_integration` in `tests/test_agentic_loop.py`).
+
+---
+
+## 🔌 External Service Dependencies & Fallback Behavior
+
+NewsIntel AI is designed to operate seamlessly across three execution environments: **Normal Local Development**, **Deterministic Test Environment**, and **Live Production Environment**. All external service dependencies are built with robust fallback handlers so the platform remains operational even when external services are offline.
+
+### Service Matrix & Fallback Mechanisms
+
+#### 1. Ollama (`qwen2.5:3b`)
+* **Purpose**: Required for live LLM execution including Policy Agent tool reasoning, Reflection Agent claim validation, and executive response synthesis.
+* **Model Name**: `qwen2.5:3b` (Configurable via `OLLAMA_MODEL`, defaulting to `qwen2.5:3b`).
+* **Behavior When Unavailable**: Connection failures and timeouts (`http://localhost:11434`) are caught gracefully. The Policy Agent falls back to a deterministic rule-based triage parser, and the Reflection Agent executes token-overlap verification, appending an `[UNVERIFIED - LLM Offline]` disclaimer.
+* **Deterministic Test Execution**: Pytest unit and integration tests mock `PolicyAgent.decide_action()`, `ReflectionAgent.reflect()`, and `synthesize_executive_summary()` using `@patch` boundaries, ensuring zero dependency on Ollama during offline test runs.
+
+#### 2. Redis
+* **Purpose**: Multi-level caching for user prompts, search results, and analytics metrics to minimize LLM latency and redundant database reads.
+* **Behavior When Unavailable**: Catches `redis.exceptions.ConnectionError` and `redis.exceptions.TimeoutError` without throwing unhandled exceptions.
+* **Cache Fallback**: On connection failure, cache lookups return `None` (treated as a standard cache miss), allowing workflow execution to proceed directly. Cache hit rates gracefully fall back to live in-memory statistics.
+
+#### 3. MongoDB
+* **Purpose**: Primary persistent document storage for article metadata, category statistics, and ingestion history.
+* **Behavior When Unavailable**: `MongoDBManager` detects connection failures upon startup or query execution and automatically redirects all reading and writing operations to the local JSON disk storage ([`backend/app/data/articles_store.json`](file:///c:/Users/AishwaryaK/Desktop/agent/backend/app/data/articles_store.json)).
+
+#### 4. Qdrant
+* **Purpose**: Vector database for high-dimensional semantic search and vector similarity calculations over indexed news.
+* **Behavior When Unavailable**: `QdrantManager` catches connection errors and seamlessly falls back to an in-memory TF-IDF / BM25 keyword and token-overlap search over title and content fields.
+
+#### 5. RSS Feeds & Ingestion
+* **Ingestion Failure Behavior**: Executed in parallel worker pools. A failure in an individual media feed (e.g. HTTP 404/500) is caught and logged without interrupting ingestion from remaining active feeds.
+* **Timeout Behavior**: Enforces strict connection and read timeouts (`timeout=5.0s`). Slow or non-responsive feeds time out silently.
+* **Malformed Feed Behavior**: Feedparser exceptions and malformed XML tags are sanitized; unparseable entries are skipped while valid items are processed.
+
+#### 6. HuggingFace / BGE-M3
+* **Production Usage**: Generates dense semantic vector embeddings (`BAAI/bge-m3` or lightweight sentence-transformers) for article indexing and duplicate detection.
+* **Offline Test Behavior**: Falls back to deterministic token-similarity and title token-overlap metrics when models or network connections are unavailable.
+* **Deterministic Test Fallback**: Integration tests mock embedding outputs with deterministic fixed-size vector representations to guarantee offline test execution.
+
+#### 7. Model Context Protocol (MCP)
+* **Architecture**: Implements standard Model Context Protocol via stdio JSON-RPC channels (`app/mcp_server.py` and `app/mcp_client.py`).
+* **How to Start Server**: Automatically managed in FastAPI via async lifespan context (`app.main:app`), or executed standalone via `python -m app.mcp_server`.
+* **How Tests Mock/Use It**: Unit tests call repository layer methods directly or use `TestClient(app)` with automatic fallback handling when stdio pipes are uninitialized.
+
+---
+
+### Execution Environment Matrix
+
+| Environment | Ollama | Redis | MongoDB | Qdrant | Execution & Test Strategy |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **1. Normal Local Dev** | Optional | Optional | Optional | Optional | Uses live services if running; automatically falls back to local JSON stores and heuristic agents if services are offline. |
+| **2. Deterministic Test Suite** | Mocked | Mocked | Isolating File | Mocked | Offline test execution (`python -m pytest -q`). Zero network access or running external daemons required (**87 / 87 Passed**). |
+| **3. Live Integration** | Required | Optional | Optional | Optional | Full live integration testing (`python -m pytest -m live -q`) validating actual LLM inference against local Ollama (`qwen2.5:3b`). |
 
 ---
 

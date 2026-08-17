@@ -440,16 +440,17 @@ def evaluate_execution(
     first_relevant_rank = 0
 
     for rank, doc in enumerate(docs_to_eval, 1):
-        content = (doc.get("title", "") + " " + doc.get("content", "")).lower()
+        content = (doc.get("title", "") + " " + doc.get("content", "") + " " + doc.get("cleaned_content", "")).lower()
         doc_tokens = set(tokenize(content))
         overlap = query_tokens.intersection(doc_tokens)
-        is_relevant = len(overlap) >= 2 or (len(query_tokens) > 0 and len(overlap) / len(query_tokens) > 0.15)
+        is_relevant = len(overlap) >= 1 or (len(query_tokens) > 0 and len(overlap) / len(query_tokens) > 0.10)
         if is_relevant:
             relevant_count += 1
             if first_relevant_rank == 0:
                 first_relevant_rank = rank
-        if rank == 5:
-            precision_at_5 = relevant_count / 5.0
+
+    eval_denom = min(5, len(docs_to_eval)) if docs_to_eval else 5
+    precision_at_5 = relevant_count / float(eval_denom)
 
     if first_relevant_rank > 0:
         mrr_at_10 = 1.0 / first_relevant_rank

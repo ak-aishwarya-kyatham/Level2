@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import requests
+from typing import List, Dict, Any, Optional, Tuple
 from collections import Counter
 from app.workflows.langgraph_state import AgentState
 
@@ -264,11 +265,12 @@ def _synthesize_contextual_implications(title: str, source: str) -> str:
             "and overall macroeconomic stability."
         )
 
-    # Domain 5: Crime / Court / Legal / High Court / Supreme Court / Police / Investigation
-    if has_kw(["court", "murder", "police", "arrested", "probe", "investigation", "crime", "justice", "jail", "cbi"]):
+    # Domain 5: Crime / Court / Legal / High Court / Supreme Court / Police / Investigation / Violent Crime / Missing Persons
+    if has_kw(["court", "murder", "police", "arrested", "probe", "investigation", "crime", "justice", "jail", "cbi", "stabbed", "death", "killed", "dead", "homicide", "victim", "suspect", "assault", "body", "slain", "missing", "accuses", "accused", "harass", "harassed", "harassing", "harassment", "abduction", "kidnap", "extortion", "threat", "fir", "complaint"]):
         return (
-            f"As reported by {source}, judicial and law enforcement authorities are actively addressing this critical matter. "
-            "Ongoing legal proceedings and official inquiries emphasize accountability, public safety standards, and strict adherence to statutory due process."
+            f"As reported by {source}, law enforcement and judicial authorities are actively investigating this crime and missing persons case. "
+            "Police search operations, forensic gathering, and criminal investigation into harassment allegations emphasize public safety enforcement, victim protection, "
+            "and strict legal accountability under statutory criminal law."
         )
 
     # Domain 6: Education / Schools / Academic Closures & Civic Advisories

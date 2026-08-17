@@ -228,6 +228,15 @@ async def tool_node(state: AgentState) -> AgentState:
     # 2. Sanitize result before recording
     sanitized_result = sanitize_observation(result)
     
+    # Record agent execution metrics in news_repository
+    try:
+        from app.repositories.news_repository import news_repository
+        agent_label = "RAG Search & Retrieval Agent" if tool_name == "search_live_news" else "Ingestion Agent (RSS & Web)"
+        is_success = not (isinstance(result, dict) and "error" in result)
+        news_repository.record_agent_execution(agent_label, (t_end - t_start) * 1000, is_success)
+    except Exception as ex_log:
+        logger.warning(f"Could not record agent execution log: {ex_log}")
+
     # Record observation
     observation = {
         "iteration": iteration,
@@ -360,37 +369,41 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
                                     "published_date": published_date
                                 })
     
-    if not articles:
-        # Extract title from query quotes if available
-        quoted_title = re.findall(r'["\u201c\u201d]([^"\u201c\u201d]+)["\u201c\u201d]', query)
-        if not quoted_title:
-            quoted_title = re.findall(r"['\u2018\u2019]([^'\u2018\u2019]+)['\u2018\u2019]", query)
-        if quoted_title:
-            t = quoted_title[0]
-            articles = [{
-                "title": t,
-                "content": t,
-                "cleaned_content": t,
-                "source": "Live Media",
-                "url": "#",
-                "category": "General News",
-                "published_date": ""
-            }]
-        else:
-            return ""
-    
-    # Deduplicate by title
-    seen = set()
-    unique = []
-    for a in articles:
-        if a["title"] not in seen:
-            seen.add(a["title"])
-            unique.append(a)
-    
-    if intent == "compare" or source1_val or source2_val:
-        return synthesize_comparison_briefing(query, unique, source1=source1_val, source2=source2_val)
+    try:
+        if not articles:
+            # Extract title from query quotes if available
+            quoted_title = re.findall(r'["\u201c\u201d]([^"\u201c\u201d]+)["\u201c\u201d]', query)
+            if not quoted_title:
+                quoted_title = re.findall(r"['\u2018\u2019]([^'\u2018\u2019]+)['\u2018\u2019]", query)
+            if quoted_title:
+                t = quoted_title[0]
+                articles = [{
+                    "title": t,
+                    "content": t,
+                    "cleaned_content": t,
+                    "source": "Live Media",
+                    "url": "#",
+                    "category": "General News",
+                    "published_date": ""
+                }]
+            else:
+                return "No relevant observations were retrieved for your query. Please verify search parameters or refresh the news feeds."
+        
+        # Deduplicate by title
+        seen = set()
+        unique = []
+        for a in articles:
+            if a["title"] not in seen:
+                seen.add(a["title"])
+                unique.append(a)
+        
+        if intent == "compare" or source1_val or source2_val:
+            return synthesize_comparison_briefing(query, unique, source1=source1_val, source2=source2_val)
 
-    return synthesize_executive_summary(query, unique[:5], llm_summary=None, intent=intent or "summarize")
+        return synthesize_executive_summary(query, unique[:5], llm_summary=None, intent=intent or "summarize")
+    except Exception as ex:
+        logger.error(f"[Workflow] Exception during response synthesis: {ex}")
+        return "Unable to synthesize response from observations due to processing format errors."
 
 
 # Reflection node
@@ -402,7 +415,7 @@ async def reflection_node(state: AgentState) -> AgentState:
 
     # Run reflection
     report = await reflection_agent.reflect(query=query, answer=answer, history=history)
-    state["reflection_report"] = report.dict()
+    state["reflection_report"] = report.model_dump() if hasattr(report, "model_dump") else report.dict()
 
     reflection_status = report.reflection_status
     fallback_used     = report.fallback_used
@@ -509,6 +522,18 @@ async def reflection_node(state: AgentState) -> AgentState:
         # Override cache_hit_rate with actual dynamic value from Redis counters
         metrics["cache_hit_rate"] = get_cache_hit_rate()
         state["evaluation_metrics"] = metrics
+        
+        # Persist dynamic evaluation run to news_repository store
+        try:
+            from app.repositories.news_repository import news_repository
+            news_repository.record_evaluation_run({
+                "query": query,
+                "metrics": metrics,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        except Exception as ex_eval:
+            logger.warning(f"Could not record evaluation run: {ex_eval}")
+
         state["agent_trace"].append(
             f"Reflection complete. Status={reflection_status}. Finalizing response."
         )

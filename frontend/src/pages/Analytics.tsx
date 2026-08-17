@@ -539,26 +539,32 @@ export default function Analytics() {
                       <Cpu className="w-5 h-5 text-violet-600" />
                       Multi-Agent Pipeline Health & Execution Latency
                     </h2>
-                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                      100% Operational
+                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                      Dynamic Pipeline Metrics
                     </span>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Execution time benchmark (ms) and success rate across the 5 specialized backend agents.
+                    Execution time benchmark (ms) and success rate across backend agents calculated from actual execution logs.
                   </p>
 
                   <div className="space-y-4">
-                    {data.agent_performance.map((agent) => (
+                    {data.agent_performance.map((agent: any) => (
                       <div key={agent.agent} className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            <CheckCircle2 className={`w-3.5 h-3.5 ${agent.success_rate != null ? "text-emerald-500" : "text-slate-400"}`} />
                             {agent.agent}
                           </span>
                           <div className="flex items-center gap-2">
-                            <span className="text-slate-500 text-[11px]">{agent.avg_latency_ms} ms</span>
-                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-md">
-                              {agent.success_rate}%
+                            <span className="text-slate-500 text-[11px]">
+                              {agent.avg_latency_ms != null ? `${agent.avg_latency_ms} ms` : "N/A"}
+                            </span>
+                            <span className={`px-2 py-0.5 font-extrabold text-[10px] rounded-md ${
+                              agent.success_rate != null
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-200 text-slate-600"
+                            }`}>
+                              {agent.success_rate != null ? `${agent.success_rate}%` : "Awaiting Data"}
                             </span>
                           </div>
                         </div>
@@ -567,7 +573,7 @@ export default function Analytics() {
                         <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                           <div
                             className="bg-violet-600 h-2 rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min((agent.avg_latency_ms / 300) * 100, 100)}%` }}
+                            style={{ width: `${agent.avg_latency_ms != null ? Math.min((agent.avg_latency_ms / 300) * 100, 100) : 0}%` }}
                           />
                         </div>
                       </div>

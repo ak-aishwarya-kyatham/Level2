@@ -1,0 +1,284 @@
+[
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 22.8,
+    "success": true,
+    "timestamp": "2026-08-17T07:21:17.577451"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 1141.6,
+    "success": true,
+    "timestamp": "2026-08-17T07:25:31.902518"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 610.4,
+    "success": true,
+    "timestamp": "2026-08-17T07:55:04.275502"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 1118.9,
+    "success": true,
+    "timestamp": "2026-08-17T08:00:22.941858"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.1,
+    "success": true,
+    "timestamp": "2026-08-17T08:04:29.284260"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T08:04:29.288566"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T08:10:20.493041"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T08:10:20.495853"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 26.6,
+    "success": true,
+    "timestamp": "2026-08-17T09:28:08.720511"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 18.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:29:51.392649"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.039707"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.042299"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.055852"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.058963"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.061258"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.063574"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.065770"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.120552"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.124026"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:34:33.141772"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:36:55.035378"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:36:55.037919"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.710832"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.714185"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.727350"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.730088"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.732469"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.735394"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.737818"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.766825"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.770011"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:38:45.788140"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:41:08.042089"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T09:41:08.045098"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 20.5,
+    "success": true,
+    "timestamp": "2026-08-17T12:52:44.325653"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 625.1,
+    "success": true,
+    "timestamp": "2026-08-17T12:54:32.444963"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.230058"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.238409"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.269297"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.273933"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.278095"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.282265"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.289311"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.355419"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.362082"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-17T13:01:52.390499"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 80.7,
+    "success": true,
+    "timestamp": "2026-08-17T13:12:45.466834"
+  }
+]
