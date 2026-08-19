@@ -107,13 +107,16 @@ class NewsRepository:
             logger.error(f"Failed to save agent logs to disk: {e}")
 
     def record_evaluation_run(self, run_data: Dict[str, Any]):
-        """Records actual execution evaluation metrics produced by evaluator.py."""
+        """Records actual execution evaluation metrics, model metadata, tool latencies, and per-test-case outcomes."""
         if not isinstance(run_data, dict):
             return
         run_entry = {
             "run_id": run_data.get("run_id") or f"run_{int(datetime.utcnow().timestamp() * 1000)}",
             "timestamp": run_data.get("timestamp") or datetime.utcnow().isoformat(),
             "query": run_data.get("query", ""),
+            "model_name": run_data.get("model_name", os.getenv("OLLAMA_MODEL", "qwen2.5:3b")),
+            "tool_calls": run_data.get("tool_calls", []),
+            "test_cases": run_data.get("test_cases", []),
             "metrics": run_data.get("metrics", {})
         }
         self.evaluation_runs.append(run_entry)

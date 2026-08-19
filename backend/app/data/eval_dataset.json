@@ -1,0 +1,62 @@
+[
+  {
+    "query": "Compare BBC and NDTV coverage of AI developments",
+    "expected_tool": "compare_news_sources"
+  },
+  {
+    "query": "Find the latest news on artificial intelligence and machine learning",
+    "expected_tool": "search_live_news"
+  },
+  {
+    "query": "Show the current news analytics and overall dashboard statistics",
+    "expected_tool": "get_dashboard_analytics"
+  },
+  {
+    "query": "What are the trending topics and top stories this week?",
+    "expected_tool": "search_live_news"
+  },
+  {
+    "query": "Compare Times of India and BBC coverage of global markets",
+    "expected_tool": "compare_news_sources"
+  },
+  {
+    "query": "Get me recent news updates about the technology sector",
+    "expected_tool": "search_live_news"
+  },
+  {
+    "query": "Show dashboard statistics and total article counts for today",
+    "expected_tool": "get_dashboard_analytics"
+  },
+  {
+    "query": "How does Economic Times compare to Reuters on budget policy?",
+    "expected_tool": "compare_news_sources"
+  },
+  {
+    "query": "Summarize top technology and science news today",
+    "expected_tool": "search_live_news"
+  },
+  {
+    "query": "What are the top news categories and source breakdown right now?",
+    "expected_tool": "get_dashboard_analytics"
+  },
+  {
+    "query": "Compare CNN and Reuters reporting on renewable energy innovation",
+    "expected_tool": "compare_news_sources"
+  },
+  {
+    "query": "Fetch system health, source statistics, and platform performance metrics",
+    "expected_tool": "get_dashboard_analytics"
+  },
+  {
+    "query": "Search recent articles on semiconductor manufacturing and chip industry",
+    "expected_tool": "search_live_news"
+  },
+  {
+    "query": "Compare CNN and Fox News coverage of climate policy",
+    "expected_tool": "compare_news_sources"
+  },
+  {
+    "query": "Give me overall database counts and ingested articles metrics",
+    "expected_tool": "get_dashboard_analytics"
+  }
+]

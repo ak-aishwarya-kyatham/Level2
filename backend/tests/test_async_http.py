@@ -1,9 +1,14 @@
 import pytest
 import httpx
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from app.utils.async_http import async_post_json
 
 pytestmark = pytest.mark.unit
+
+@pytest.fixture(autouse=True)
+def force_httpx_path():
+    with patch("app.utils.async_http._is_requests_mocked", return_value=False):
+        yield
 
 async def test_async_post_json_success():
     """1. Test successful HTTP 200 response with valid JSON payload using httpx.AsyncClient."""
@@ -12,7 +17,7 @@ async def test_async_post_json_success():
     fake_response.json.return_value = {"response": "Success result", "status": "ok"}
     fake_response.text = '{"response": "Success result", "status": "ok"}'
 
-    with patch("httpx.AsyncClient.post", return_value=fake_response):
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=fake_response):
         status, data, text = await async_post_json("http://localhost:11434/api/generate", {"prompt": "hi"}, timeout=5.0)
 
     assert status == 200
@@ -22,7 +27,7 @@ async def test_async_post_json_success():
 
 async def test_async_post_json_timeout():
     """2. Test HTTP timeout handling with httpx.TimeoutException."""
-    with patch("httpx.AsyncClient.post", side_effect=httpx.TimeoutException("Request timed out")):
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, side_effect=httpx.TimeoutException("Request timed out")):
         with pytest.raises((httpx.TimeoutException, Exception)):
             await async_post_json("http://localhost:11434/api/generate", {"prompt": "hi"}, timeout=0.1)
 
@@ -34,7 +39,7 @@ async def test_async_post_json_http_error():
     fake_response.json.return_value = {"error": "Internal Server Error"}
     fake_response.text = '{"error": "Internal Server Error"}'
 
-    with patch("httpx.AsyncClient.post", return_value=fake_response):
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=fake_response):
         status, data, text = await async_post_json("http://localhost:11434/api/generate", {"prompt": "hi"}, timeout=5.0)
 
     assert status == 500
@@ -49,7 +54,7 @@ async def test_async_post_json_malformed_response():
     fake_response.json.side_effect = Exception("JSON Decode Error")
     fake_response.text = "<html>502 Bad Gateway</html>"
 
-    with patch("httpx.AsyncClient.post", return_value=fake_response):
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=fake_response):
         status, data, text = await async_post_json("http://localhost:11434/api/generate", {"prompt": "hi"}, timeout=5.0)
 
     assert status == 200

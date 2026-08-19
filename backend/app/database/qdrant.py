@@ -12,21 +12,34 @@ class QdrantManager:
     Manages Qdrant vector database connections, collection initialization,
     vector searching, and article embedding upserts.
     Configurable via QDRANT_URL environment variable.
+    Lazy-initialized on first property access to prevent connection attempts at import time.
     """
     def __init__(self):
-        qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
-        try:
-            self.client = QdrantClient(url=qdrant_url, timeout=0.5)
-            self.collection_name = "news_articles"
-            self._ensure_collection()
-            logger.info(f"[Qdrant] Connected to Qdrant at {qdrant_url}.")
-        except Exception as e:
-            logger.info(f"[Qdrant] Server offline at {qdrant_url} ({e}). Vector search will use in-memory cosine fallback.")
-            self.client = None
+        self._client = None
+        self._initialized = False
+        self.collection_name = "news_articles"
+
+    @property
+    def client(self) -> Optional[QdrantClient]:
+        """Lazy property getter that attempts connection on first access."""
+        if not self._initialized:
+            self._initialized = True
+            if os.getenv("DISABLE_QDRANT", "false").lower() == "true":
+                self._client = None
+                return None
+            qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+            try:
+                self._client = QdrantClient(url=qdrant_url, timeout=0.5, check_compatibility=False)
+                self._ensure_collection()
+                logger.info(f"[Qdrant] Connected to Qdrant at {qdrant_url}.")
+            except Exception as e:
+                logger.info(f"[Qdrant] Server offline at {qdrant_url} ({e}). Vector search will use in-memory cosine fallback.")
+                self._client = None
+        return self._client
 
     def _ensure_collection(self):
-        if self.client and not self.client.collection_exists(self.collection_name):
-            self.client.create_collection(
+        if self._client and not self._client.collection_exists(self.collection_name):
+            self._client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=VectorParams(size=1024, distance=Distance.COSINE),
             )

@@ -131,16 +131,16 @@ export default function Analytics() {
     ? Math.max(...data.timeline.map((t) => t.count), 1) 
     : 100;
 
-  // Calculate total agent latency
-  const totalLatency = data?.agent_performance 
+  // Calculate total agent latency from real backend data
+  const totalLatency = data?.agent_performance && data.agent_performance.length > 0 
     ? data.agent_performance.reduce((acc, curr) => acc + curr.avg_latency_ms, 0)
-    : 585;
+    : null;
 
   const deduplicationSavings = data?.total_articles && data?.duplicates_avoided
     ? Math.round((data.duplicates_avoided / (data.total_articles + data.duplicates_avoided)) * 100)
-    : 80;
+    : null;
 
-  const categoryConfidence = 94.5;
+  const categoryConfidence = null;
 
 
   return (
@@ -195,36 +195,36 @@ export default function Analytics() {
           />
 
           <MetricCard
-            title="Duplicates Filtered"
-            value={data.duplicates_avoided || 0}
-            subtitle={`${deduplicationSavings}% noise reduction`}
-            icon={Zap}
-            iconBgColor="bg-amber-50"
-            iconTextColor="text-amber-600"
-            badgeText={`${deduplicationSavings}% Saved`}
-            badgeColor="emerald"
+            title="Deduplication Efficiency"
+            value={deduplicationSavings !== null ? `${deduplicationSavings}%` : "N/A"}
+            subtitle={deduplicationSavings !== null ? "Article volume saved via semantic dedup" : "[Sample Data / Awaiting Run]"}
+            icon={Sparkles}
+            iconBgColor="bg-emerald-50"
+            iconTextColor="text-emerald-600"
+            badgeText={deduplicationSavings !== null ? `${deduplicationSavings}% Saved` : "Sample Data"}
+            badgeColor={deduplicationSavings !== null ? "emerald" : "amber"}
           />
 
           <MetricCard
             title="Pipeline Latency"
-            value={`${totalLatency}ms`}
-            subtitle="End-to-end multi-agent pipeline"
+            value={totalLatency !== null ? `${totalLatency}ms` : "N/A"}
+            subtitle={totalLatency !== null ? "End-to-end multi-agent pipeline wall clock" : "[Sample Data / Awaiting Run]"}
             icon={BrainCircuit}
             iconBgColor="bg-violet-50"
             iconTextColor="text-violet-600"
-            badgeText="Optimized"
-            badgeColor="indigo"
+            badgeText={totalLatency !== null ? "Optimized" : "Sample Data"}
+            badgeColor={totalLatency !== null ? "indigo" : "amber"}
           />
 
           <MetricCard
             title="Categorization Quality"
-            value={`${categoryConfidence}%`}
-            subtitle="AI entity classification score"
+            value={categoryConfidence !== null ? `${categoryConfidence}%` : "N/A"}
+            subtitle={categoryConfidence !== null ? "AI entity classification score" : "[Sample Data / Awaiting Run]"}
             icon={ShieldAlert}
             iconBgColor="bg-emerald-50"
             iconTextColor="text-emerald-600"
-            badgeText="High Precision"
-            badgeColor="emerald"
+            badgeText={categoryConfidence !== null ? "High Precision" : "Sample Data"}
+            badgeColor={categoryConfidence !== null ? "emerald" : "amber"}
           />
         </div>
       )}

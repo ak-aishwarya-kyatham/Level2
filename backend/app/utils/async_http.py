@@ -7,8 +7,10 @@ from unittest.mock import Mock
 logger = logging.getLogger(__name__)
 
 def _is_requests_mocked() -> bool:
-    """Returns True if requests.post has been intercepted by a unittest.mock patch."""
+    """Returns True if requests.post has been intercepted by a test mock (excluding global conftest fallback)."""
     post_fn = requests.post
+    if getattr(post_fn, "__name__", "") == "mock_ollama_requests":
+        return False
     return isinstance(post_fn, Mock) or hasattr(post_fn, "side_effect") or hasattr(post_fn, "return_value") or "Mock" in type(post_fn).__name__
 
 async def async_post_json(url: str, payload: dict, timeout: float) -> Tuple[int, Dict[str, Any], str]:

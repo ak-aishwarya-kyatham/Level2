@@ -1,36 +1,335 @@
 [
   {
-    "run_id": "run_1786932076273",
-    "timestamp": "2026-08-17T07:31:16.273531",
-    "query": "Latest news on Artificial Intelligence and Tech Developments",
+    "run_id": "run_1787026756767",
+    "timestamp": "2026-08-18T09:49:16.767805",
+    "query": "Latest news on 'Garlanded as if he won a war'",
     "metrics": {
-      "precision_at_5": 0.8,
-      "mrr_at_10": 0.85,
-      "faithfulness": 0.92,
-      "groundedness": 0.88,
-      "answer_relevance": 0.82,
-      "routing_accuracy": 0.95,
-      "latency_seconds": 0.42,
-      "cache_hit_rate": 0.25,
-      "deduplication_recall": 0.99,
-      "categorization_f1": 0.91
+      "precision_at_5": 0.6,
+      "mrr_at_10": 1.0,
+      "routing_accuracy": 0.4,
+      "faithfulness": 0.16,
+      "groundedness": 0.16,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 172.8901,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
     }
   },
   {
-    "run_id": "run_1786933961760",
-    "timestamp": "2026-08-17T08:02:41.760349",
-    "query": "Dynamic Query 2",
+    "run_id": "run_1787026911343",
+    "timestamp": "2026-08-18T09:51:51.343267",
+    "query": "Tell me more about \"Cargo Rates Surge Amid US-Iran War, Yet India Pulls Off 19.6% Export Jump. Here's How\" and summarize its implications.",
     "metrics": {
-      "precision_at_5": 0.9,
-      "mrr_at_10": 0.95,
-      "faithfulness": 0.96,
-      "groundedness": 0.92,
-      "answer_relevance": 0.89,
-      "routing_accuracy": 0.95,
-      "latency_seconds": 0.38,
-      "cache_hit_rate": 0.30,
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.34,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
       "deduplication_recall": 1.0,
-      "categorization_f1": 0.95
+      "latency_seconds": 22.7201,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787026952419",
+    "timestamp": "2026-08-18T09:52:32.419737",
+    "query": "Summarize top tech news today",
+    "metrics": {
+      "precision_at_5": 1.8,
+      "mrr_at_10": 0.5,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.59,
+      "groundedness": 0.38,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 24.8983,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787027510439",
+    "timestamp": "2026-08-18T10:01:50.439978",
+    "query": "Compare Telangana news coverage across Indian Express and The Hindu",
+    "metrics": {
+      "precision_at_5": 1.0,
+      "mrr_at_10": 1.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.43,
+      "groundedness": 0.94,
+      "answer_relevance": 0.6,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 0.2573,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787027772136",
+    "timestamp": "2026-08-18T10:06:12.136191",
+    "query": "Tell me more about \"Stormy Monsoon session comes to end; several Bills passed without debate\" and summarize its implications.",
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.32,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 22.469,
+      "cache_hit": false,
+      "cache_hit_rate": 0.25
+    }
+  },
+  {
+    "run_id": "run_1787027973524",
+    "timestamp": "2026-08-18T10:09:33.523989",
+    "query": "what is the trending topic of telangana state",
+    "metrics": {
+      "precision_at_5": 2.0,
+      "mrr_at_10": 1.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.63,
+      "groundedness": 0.46,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 24.2921,
+      "cache_hit": false,
+      "cache_hit_rate": 0.4286
+    }
+  },
+  {
+    "run_id": "run_1787028020776",
+    "timestamp": "2026-08-18T10:10:20.776385",
+    "query": "Tell me more about \"Tamil Nadu Budget 2026: TVK-led government's first financial blueprint\" and summarize its implications.",
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.33,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 22.7058,
+      "cache_hit": false,
+      "cache_hit_rate": 0.375
+    }
+  },
+  {
+    "run_id": "run_1787028185597",
+    "timestamp": "2026-08-18T10:13:05.597979",
+    "query": "Tell me more about \"Photographer arrested in Krishna district for allegedly creating fake account in woman’s name\" and summarize its implications.",
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.26,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 13.9259,
+      "cache_hit": false,
+      "cache_hit_rate": 0.4
+    }
+  },
+  {
+    "run_id": "run_1787028259940",
+    "timestamp": "2026-08-18T10:14:19.940483",
+    "query": "Tell me more about \"R.K. Singh calls Indian government pusillanimous over allegedly abandoning patrolling point in Arunachal\" and summarize its implications.",
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.31,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 22.5393,
+      "cache_hit": false,
+      "cache_hit_rate": 0.3636
+    }
+  },
+  {
+    "run_id": "run_1787028284647",
+    "timestamp": "2026-08-18T10:14:44.647013",
+    "query": "Tell me more about \"97 MoUs worth over ₹67,542 crore signed at TVK government's first investment conclave\" and summarize its implications.",
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.34,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 22.6115,
+      "cache_hit": false,
+      "cache_hit_rate": 0.3333
+    }
+  },
+  {
+    "run_id": "run_1787031393533",
+    "timestamp": "2026-08-18T11:06:33.533622",
+    "query": "Tell me more about \"Not delving into religious rights, only dealing with well-being and health of captive elephants, Supreme Court says\" and summarize its implications.",
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.31,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 13.9194,
+      "cache_hit": false,
+      "cache_hit_rate": 0.3077
+    }
+  },
+  {
+    "run_id": "run_1787032862294",
+    "timestamp": "2026-08-18T11:31:02.294515",
+    "query": "Tell me more about \"Bihar transfers 17 IPS officers amid row over AK-47 use during student protest\" and summarize its implications.",
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.37,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 22.6918,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787038163680",
+    "timestamp": "2026-08-18T12:59:23.680366",
+    "query": "Latest news on 'Garlanded as if he won a war'",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [
+      {
+        "tool": "search_live_news",
+        "latency_ms": 14205.2,
+        "status": "success"
+      },
+      {
+        "tool": "compare_news_sources",
+        "latency_ms": 11840.5,
+        "status": "success"
+      }
+    ],
+    "test_cases": [
+      {
+        "query": "Summarize top tech news today",
+        "expected_tool": "search_live_news",
+        "actual_tool": "search_live_news",
+        "outcome": "PASS",
+        "latency_ms": 1245.2
+      },
+      {
+        "query": "Compare Times of India vs The Hindu coverage",
+        "expected_tool": "compare_news_sources",
+        "actual_tool": "compare_news_sources",
+        "outcome": "PASS",
+        "latency_ms": 1890.1
+      },
+      {
+        "query": "Retrieve dashboard global system analytics",
+        "expected_tool": "get_dashboard_analytics",
+        "actual_tool": "get_dashboard_analytics",
+        "outcome": "PASS",
+        "latency_ms": 845.6
+      }
+    ],
+    "metrics": {
+      "precision_at_5": 0.6,
+      "mrr_at_10": 1.0,
+      "routing_accuracy": 0.8,
+      "faithfulness": 0.16,
+      "groundedness": 0.16,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 80.3445,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787102105968",
+    "timestamp": "2026-08-19T06:45:05.968724",
+    "query": "Tell me more about \"PM Modi wants Rahman’s India visit to be ‘memorable’, says Envoy to Bangladesh\" and summarize its implications.",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [],
+    "test_cases": [],
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.31,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 22.7302,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787102267479",
+    "timestamp": "2026-08-19T06:47:47.479643",
+    "query": "Tell me more about \"Jharkhand Govt. releases list of 44 recruitment exams cancelled due to irregularities\" and summarize its implications.",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [],
+    "test_cases": [],
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.29,
+      "groundedness": 0.0,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 22.7099,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787102289834",
+    "timestamp": "2026-08-19T06:48:09.834239",
+    "query": "Summarize top tech news today",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [],
+    "test_cases": [],
+    "metrics": {
+      "precision_at_5": 1.8,
+      "mrr_at_10": 1.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.63,
+      "groundedness": 0.48,
+      "answer_relevance": 1.0,
+      "categorization_f1": 0.78,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 16.5871,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
     }
   }
 ]

@@ -12,7 +12,9 @@ from app.utils.redis_cache import get_cache_hit_rate
 # Explicit mapping of query → expected tool.
 # NO keyword inference — every expected_tool is explicitly labeled.
 # ---------------------------------------------------------------------------
-_DATASET_PATH = os.path.join(os.path.dirname(__file__), "routing_dataset.json")
+_DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "eval_dataset.json")
+if not os.path.exists(_DATASET_PATH):
+    _DATASET_PATH = os.path.join(os.path.dirname(__file__), "routing_dataset.json")
 _CAT_EVAL_PATH = os.path.join(os.path.dirname(__file__), "categorization_eval_dataset.json")
 _DEDUP_EVAL_PATH = os.path.join(os.path.dirname(__file__), "deduplication_eval_dataset.json")
 
@@ -46,6 +48,35 @@ def evaluate_routing_accuracy(expected_tool: str, actual_tool: str) -> float:
     return 1.0 if actual_tool.strip() == expected_tool.strip() else 0.0
 
 
+def find_expected_tool_for_query(query: str) -> Optional[str]:
+    """
+    Finds expected tool for a query from GROUND_TRUTH_DATASET using exact, substring, or token overlap matching.
+    """
+    if not query or not GROUND_TRUTH_DATASET:
+        return None
+    q_lower = query.lower().strip()
+    for item in GROUND_TRUTH_DATASET:
+        gt_q = item["query"].lower().strip()
+        if q_lower == gt_q or q_lower in gt_q or gt_q in q_lower:
+            return item["expected_tool"]
+    q_tokens = set(tokenize(query))
+    if not q_tokens:
+        return None
+    best_score = 0.0
+    best_tool = None
+    for item in GROUND_TRUTH_DATASET:
+        gt_tokens = set(tokenize(item["query"]))
+        if not gt_tokens:
+            continue
+        overlap = len(q_tokens.intersection(gt_tokens)) / float(len(q_tokens.union(gt_tokens)))
+        if overlap > best_score:
+            best_score = overlap
+            best_tool = item["expected_tool"]
+    if best_score >= 0.3:
+        return best_tool
+    return None
+
+
 def calculate_dataset_routing_accuracy(actual_tool_selections: List[Dict[str, str]]) -> float:
     """
     Calculate overall routing accuracy over the evaluated queries.
@@ -54,16 +85,15 @@ def calculate_dataset_routing_accuracy(actual_tool_selections: List[Dict[str, st
     """
     if not GROUND_TRUTH_DATASET or not actual_tool_selections:
         return 0.0
-    actual_lookup = {item["query"]: item["actual_tool"] for item in actual_tool_selections}
     correct = 0
     evaluated = 0
-    for item in GROUND_TRUTH_DATASET:
-        query = item["query"]
-        expected = item["expected_tool"]
-        if query not in actual_lookup:
+    for selection in actual_tool_selections:
+        query = selection.get("query", "")
+        actual = selection.get("actual_tool", "")
+        expected = find_expected_tool_for_query(query)
+        if expected is None:
             continue
         evaluated += 1
-        actual = actual_lookup[query]
         if evaluate_routing_accuracy(expected, actual) == 1.0:
             correct += 1
     if evaluated == 0:
@@ -120,6 +150,8 @@ async def run_routing_benchmark(
         ]
 
     details = []
+    test_cases = []
+    tool_calls = []
     correct_count = 0
     confusion_matrix: Dict[str, Dict[str, int]] = {}
 
@@ -130,6 +162,7 @@ async def run_routing_benchmark(
         if expected_tool not in confusion_matrix:
             confusion_matrix[expected_tool] = {}
 
+        t_q0 = time.perf_counter()
         # Execute actual Policy Agent decision
         try:
             action = await agent.decide_action(
@@ -142,18 +175,29 @@ async def run_routing_benchmark(
         except Exception:
             actual_tool = "error"
 
+        q_latency_ms = round((time.perf_counter() - t_q0) * 1000, 2)
         is_correct = (actual_tool == expected_tool)
         if is_correct:
             correct_count += 1
 
         confusion_matrix[expected_tool][actual_tool] = confusion_matrix[expected_tool].get(actual_tool, 0) + 1
 
-        details.append({
+        tc_entry = {
             "query": query,
             "expected_tool": expected_tool,
             "actual_tool": actual_tool,
-            "correct": is_correct
-        })
+            "outcome": "PASS" if is_correct else "FAIL",
+            "latency_ms": q_latency_ms
+        }
+        test_cases.append(tc_entry)
+        details.append(tc_entry)
+
+        if actual_tool not in ("finish", "error"):
+            tool_calls.append({
+                "tool": actual_tool,
+                "latency_ms": q_latency_ms,
+                "status": "success" if is_correct else "routing_mismatch"
+            })
 
     total_queries = len(eval_data)
     evaluated_queries = len(details)
@@ -162,6 +206,7 @@ async def run_routing_benchmark(
     coverage = round(evaluated_queries / total_queries, 4) if total_queries > 0 else 0.0
 
     return {
+        "model_name": os.getenv("OLLAMA_MODEL", "qwen2.5:3b"),
         "routing_accuracy": accuracy,
         "coverage": coverage,
         "total_queries": total_queries,
@@ -169,7 +214,9 @@ async def run_routing_benchmark(
         "correct_selections": correct_count,
         "incorrect_selections": incorrect_selections,
         "confusion_matrix": confusion_matrix,
-        "details": details
+        "details": details,
+        "test_cases": test_cases,
+        "tool_calls": tool_calls
     }
 
 
@@ -459,12 +506,8 @@ def evaluate_execution(
 
     # 2. Routing Accuracy — Dataset-driven, NO keyword inference
     routing_accuracy = 1.0
-    ground_truth_entry = next(
-        (item for item in GROUND_TRUTH_DATASET if item["query"].lower() == query.lower()),
-        None
-    )
-    if ground_truth_entry:
-        expected_tool = ground_truth_entry["expected_tool"]
+    expected_tool = find_expected_tool_for_query(query)
+    if expected_tool:
         actual_tool = ""
         for obs in observations:
             t = obs.get("tool", "")

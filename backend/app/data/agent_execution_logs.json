@@ -280,5 +280,101 @@
     "latency_ms": 80.7,
     "success": true,
     "timestamp": "2026-08-17T13:12:45.466834"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 53.7,
+    "success": true,
+    "timestamp": "2026-08-18T09:47:00.579102"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 31.1,
+    "success": true,
+    "timestamp": "2026-08-18T09:50:20.527226"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 1144.4,
+    "success": true,
+    "timestamp": "2026-08-18T09:52:13.970275"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-18T10:00:35.253351"
+  },
+  {
+    "agent": "Ingestion Agent (RSS & Web)",
+    "latency_ms": 0.0,
+    "success": true,
+    "timestamp": "2026-08-18T10:00:35.256706"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 31.9,
+    "success": true,
+    "timestamp": "2026-08-18T10:05:54.987562"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 945.5,
+    "success": true,
+    "timestamp": "2026-08-18T10:09:15.493388"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 138.4,
+    "success": true,
+    "timestamp": "2026-08-18T10:10:03.511540"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 37.0,
+    "success": true,
+    "timestamp": "2026-08-18T10:12:56.999567"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 34.1,
+    "success": true,
+    "timestamp": "2026-08-18T10:14:02.741429"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 110.0,
+    "success": true,
+    "timestamp": "2026-08-18T10:14:27.442158"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 21.0,
+    "success": true,
+    "timestamp": "2026-08-18T11:06:24.928299"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 24.2,
+    "success": true,
+    "timestamp": "2026-08-18T11:29:30.625001"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 25.6,
+    "success": true,
+    "timestamp": "2026-08-19T06:42:24.162608"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 26.9,
+    "success": true,
+    "timestamp": "2026-08-19T06:46:16.931562"
+  },
+  {
+    "agent": "RAG Search & Retrieval Agent",
+    "latency_ms": 1253.1,
+    "success": true,
+    "timestamp": "2026-08-19T06:47:59.811673"
   }
 ]

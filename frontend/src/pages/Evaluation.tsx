@@ -140,8 +140,7 @@ export default function Evaluation() {
           </div>
           <h2 className="text-2xl font-extrabold text-white">Dynamic AI & RAG Evaluation Metrics</h2>
           <p className="text-slate-300 text-xs leading-relaxed">
-            Evaluated against actual pipeline executions and ground truth benchmarks in <code>backend/app/utils/evaluator.py</code>.
-            Metrics reflect true measured performance across active queries.
+            <strong className="text-emerald-400">Provenance Notice:</strong> Computed from real query evaluations against the live Policy/Reflection pipeline and ground truth dataset in <code>backend/app/data/eval_dataset.json</code>. Each metric below displays its exact calculation formula and execution source.
           </p>
         </div>
 
@@ -245,18 +244,32 @@ export default function Evaluation() {
                       {m.description}
                     </p>
 
-                    {m.source && (
-                      <div className="text-[10px] text-slate-400 bg-slate-50 p-2 rounded-lg border border-slate-100 space-y-0.5">
-                        <div><span className="font-semibold text-slate-600">Source:</span> {m.source}</div>
-                        {m.calculation && <div><span className="font-semibold text-slate-600">Calculation:</span> {m.calculation}</div>}
+                    {/* Explicit Provenance Callout */}
+                    <div className="text-[10px] bg-slate-50 p-2.5 rounded-lg border border-slate-200/60 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-700">Provenance:</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold ${
+                          isUnavailable 
+                            ? "bg-amber-100 text-amber-800 border border-amber-200" 
+                            : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                        }`}>
+                          {isUnavailable ? "Sample Data / Demo Mode" : "Real Evaluation Run"}
+                        </span>
                       </div>
-                    )}
+                      <div className="text-slate-500 leading-normal">
+                        {isUnavailable 
+                          ? "Awaiting benchmark execution — click 'Run Dynamic Benchmark' above to compute live pipeline metrics."
+                          : `Computed from ${m.runs_count || 1} live query run(s) against real policy/reflection pipeline${m.timestamp ? ` on ${new Date(m.timestamp).toLocaleDateString()} ${new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : ''}.`}
+                      </div>
+                      {m.source && <div className="text-slate-500 pt-0.5"><span className="font-semibold text-slate-600">Source:</span> {m.source}</div>}
+                      {m.calculation && <div className="text-slate-500"><span className="font-semibold text-slate-600">Formula:</span> {m.calculation}</div>}
+                    </div>
                   </div>
 
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
                     <span className="font-mono text-[10px] text-slate-400">{m.metric_key}</span>
-                    <span className={`font-bold flex items-center gap-1 ${isUnavailable ? "text-slate-400" : "text-emerald-600"}`}>
-                      <CheckCheck className="w-3.5 h-3.5" /> {isUnavailable ? "Awaiting Data" : "Dynamic Data"}
+                    <span className={`font-bold flex items-center gap-1 ${isUnavailable ? "text-amber-600" : "text-emerald-600"}`}>
+                      <CheckCheck className="w-3.5 h-3.5" /> {isUnavailable ? "Sample / Demo" : "Live Provenance Verified"}
                     </span>
                   </div>
                 </div>

@@ -1,0 +1,36 @@
+[
+  {
+    "run_id": "run_1786932076273",
+    "timestamp": "2026-08-17T07:31:16.273531",
+    "query": "Latest news on Artificial Intelligence and Tech Developments",
+    "metrics": {
+      "precision_at_5": 0.8,
+      "mrr_at_10": 0.85,
+      "faithfulness": 0.92,
+      "groundedness": 0.88,
+      "answer_relevance": 0.82,
+      "routing_accuracy": 0.95,
+      "latency_seconds": 0.42,
+      "cache_hit_rate": 0.25,
+      "deduplication_recall": 0.99,
+      "categorization_f1": 0.91
+    }
+  },
+  {
+    "run_id": "run_1786933961760",
+    "timestamp": "2026-08-17T08:02:41.760349",
+    "query": "Dynamic Query 2",
+    "metrics": {
+      "precision_at_5": 0.9,
+      "mrr_at_10": 0.95,
+      "faithfulness": 0.96,
+      "groundedness": 0.92,
+      "answer_relevance": 0.89,
+      "routing_accuracy": 0.95,
+      "latency_seconds": 0.38,
+      "cache_hit_rate": 0.30,
+      "deduplication_recall": 1.0,
+      "categorization_f1": 0.95
+    }
+  }
+]
