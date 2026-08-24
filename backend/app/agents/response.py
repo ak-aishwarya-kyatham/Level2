@@ -205,6 +205,7 @@ def extract_clean_article_summary(doc: dict) -> str:
     """
     title = clean_news_sentence(doc.get("title") or "")
     content = doc.get("content") or doc.get("cleaned_content") or ""
+    source = doc.get("source") or "Live Media"
 
     raw_sentences = split_into_sentences(content)
     sentences = [clean_news_sentence(s) for s in raw_sentences if len(s.strip()) > 15]
@@ -214,12 +215,13 @@ def extract_clean_article_summary(doc: dict) -> str:
         s_lower = s.lower()
         if any(skip in s_lower for skip in ["subscribe", "click here", "read more", "copyright", "all rights reserved", "follow us"]):
             continue
-        valid_sentences.append(s)
+        if clean_news_sentence(s) != title:
+            valid_sentences.append(s)
 
     if valid_sentences:
         return " ".join(valid_sentences[:2])
 
-    return title
+    return _synthesize_contextual_implications(title, source)
 
 
 def _synthesize_contextual_implications(title: str, source: str) -> str:
@@ -249,8 +251,8 @@ def _synthesize_contextual_implications(title: str, source: str) -> str:
             "while impacting global defense supply chains, bilateral security alliances, and strategic diplomatic postures."
         )
 
-    # Domain 3: Tech / AI / Semiconductor / Google / Nvidia / Apple / Cisco
-    if has_kw(["ai", "chip", "nvidia", "google", "apple", "tech", "semiconductor", "software", "cisco", "cloud"]):
+    # Domain 3: Tech / AI / Semiconductor / Google / Nvidia / Apple / Cisco / ChatGPT
+    if has_kw(["ai", "chip", "nvidia", "google", "apple", "tech", "semiconductor", "software", "cisco", "cloud", "chatgpt"]):
         return (
             f"As reported by {source}, this development marks a significant shift in technology and enterprise strategy. "
             "Accelerated investments in hardware and artificial intelligence infrastructure drive industry competition, impacting digital adoption, "
@@ -763,14 +765,36 @@ def synthesize_comparison_briefing(query: str, docs: list, source1: str = None, 
             f"**{source1}** published {len(s1_docs)} article(s); **{source2}** published {len(s2_docs)} article(s)."
         )
 
+    # ── Identify additional revision/search documents ────────────────────────
+    s1_ids = {id(d) for d in s1_docs}
+    s2_ids = {id(d) for d in s2_docs}
+    other_docs = [d for d in docs if id(d) not in s1_ids and id(d) not in s2_ids]
+
+    other_block = ""
+    if other_docs:
+        other_items = []
+        for doc in other_docs[:5]:
+            title = clean_news_sentence(doc.get("title", "Headline"))
+            summary = extract_clean_article_summary(doc)
+            src = doc.get("source", "Live Media")
+            if summary and summary != title:
+                other_items.append(f"• **[{src}] {title}:** {summary}")
+            else:
+                other_items.append(f"• **[{src}] {title}**")
+        if other_items:
+            other_block = f"\n\n---\n\n### 🔍 Additional Grounding Context (from Revision Search):\n" + "\n".join(other_items)
+
     # ── Source links ──────────────────────────────────────────────────────────
-    link_docs = [s1_docs[i] for i, _, _ in shared_stories] + exclusive_s1[:2] + exclusive_s2[:2]
+    link_docs = [s1_docs[i] for i, _, _ in shared_stories] + exclusive_s1[:2] + exclusive_s2[:2] + other_docs[:3]
     sources_summary = []
-    for doc in link_docs[:6]:
+    seen_urls = set()
+    for doc in link_docs:
         title = clean_news_sentence(doc.get("title", "Article"))
         source = doc.get("source", "Live Media")
         url = doc.get("url", "#")
-        sources_summary.append(f"• [{source}: {title}]({url})")
+        if url not in seen_urls:
+            seen_urls.add(url)
+            sources_summary.append(f"• [{source}: {title}]({url})")
 
     # ── Assemble final output ─────────────────────────────────────────────────
     shared_section = (
@@ -780,14 +804,16 @@ def synthesize_comparison_briefing(query: str, docs: list, source1: str = None, 
         f"### 🔄 Stories Covered by Both Outlets\n\n*No overlapping stories found in current live feed.*"
     )
 
+    total_retrieved = len(s1_docs) + len(s2_docs) + len(other_docs)
     return (
         f"## ⚔️ Editorial Angle Comparison: \"{source1}\" vs \"{source2}\"\n\n"
-        f"**Live Analysis ({len(s1_docs) + len(s2_docs)} articles retrieved — "
+        f"**Live Analysis ({total_retrieved} articles retrieved — "
         f"{shared_count} shared topics, {excl_s1_count + excl_s2_count} exclusive stories)**\n\n"
         f"{shared_section}\n\n"
         f"---\n\n"
         f"### 🅰 Exclusive to {source1}:\n{excl_s1_block}\n\n"
-        f"### 🅱 Exclusive to {source2}:\n{excl_s2_block}\n\n"
+        f"### 🅱 Exclusive to {source2}:\n{excl_s2_block}"
+        f"{other_block}\n\n"
         f"---\n\n"
         f"**📊 Coverage Analysis:**  \n{analysis}\n\n"
         f"---\n"

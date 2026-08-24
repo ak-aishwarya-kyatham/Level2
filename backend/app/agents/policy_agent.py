@@ -221,6 +221,15 @@ def parse_and_validate_policy_action(
     action_obj.validation_error = error_msg if not is_valid else None
     return action_obj
 
+_OLLAMA_OFFLINE_UNTIL = 0.0
+
+def mark_ollama_offline(seconds: float = 60.0):
+    global _OLLAMA_OFFLINE_UNTIL
+    _OLLAMA_OFFLINE_UNTIL = time.time() + seconds
+
+def is_ollama_circuit_open() -> bool:
+    return time.time() < _OLLAMA_OFFLINE_UNTIL
+
 class PolicyAgent:
     """
     Policy Agent that decides whether to invoke an MCP tool or finish the request.
@@ -244,6 +253,26 @@ class PolicyAgent:
         """
         Queries Ollama to decide the next action and validates the result.
         """
+        if is_ollama_circuit_open():
+            fallback_reason = "Ollama circuit breaker active from previous timeout"
+            logger.info(f"[Policy Agent] Circuit breaker active — skipping Ollama wait on iteration {iteration_count}.")
+            if iteration_count == 1:
+                fallback = PolicyAction(
+                    action="tool",
+                    tool="search_live_news",
+                    arguments={"query": query, "limit": 10},
+                    thought=f"Ollama circuit breaker active ({fallback_reason}). Falling back to search_live_news tool.",
+                    is_valid=True
+                )
+            else:
+                fallback = PolicyAction(
+                    action="finish",
+                    answer="No detailed information was found.",
+                    thought=f"Ollama circuit breaker active ({fallback_reason}). Routing to local synthesis from retrieved observations.",
+                    is_valid=True
+                )
+            return parse_and_validate_policy_action(fallback, tools)
+
         # Format tools description
         tools_str = ""
         for tool in tools:
@@ -255,9 +284,15 @@ class PolicyAgent:
         history_str = ""
         if history:
             for idx, step in enumerate(history, 1):
+                tool_name = step.get('tool', '')
+                if tool_name in ["reflection_feedback", "reflection_critique"]:
+                    history_str += f"Step {idx} [REFLECTION AGENT CRITIQUE - REVISION REQUIRED]:\n"
+                    history_str += f"  Reflection Feedback: {step.get('result')}\n"
+                    history_str += f"  REVISION DIRECTIVE: The Reflection Agent flagged unsupported/unverified claims in the previous synthesis. You MUST choose a DIFFERENT tool or a MORE SPECIFIC search query/category (e.g. search_live_news with specific topic keywords) to retrieve grounded evidence to address these claims. Do NOT repeat identical tool calls with identical arguments!\n\n"
+                    continue
                 history_str += f"Step {idx}:\n"
                 history_str += f"  Thought: {step.get('thought')}\n"
-                history_str += f"  Tool Called: {step.get('tool')}\n"
+                history_str += f"  Tool Called: {tool_name}\n"
                 history_str += f"  Arguments: {json.dumps(step.get('arguments'))}\n"
                 res = step.get('result')
                 if isinstance(res, list):
@@ -283,16 +318,18 @@ class PolicyAgent:
             "  \"action\": \"tool\" or \"finish\",\n"
             "  \"tool\": \"tool_name_here\" (required if action is 'tool'),\n"
             "  \"arguments\": { ... } (required if action is 'tool'),\n"
-            "  \"answer\": \"your final synthesized answer\" (required if action is 'finish'),\n"
+            "  \"answer\": \"concise summary of findings\" (required if action is 'finish'),\n"
             "  \"thought\": \"reasoning explaining why you are choosing this action\"\n"
             "}\n"
             "Rules:\n"
             "1. IMPORTANT: If no tools have been called yet (Observation History is empty), you MUST choose action='tool' and call search_live_news. You are NOT allowed to choose 'finish' without any observations.\n"
             "2. Analyze the user query and the observation history.\n"
             "3. If you need more information, call an available tool. Do not hallucinate.\n"
-            "4. Only choose action='finish' AFTER you have at least one observation with real data. Provide a complete, detailed answer in the 'answer' field.\n"
+            "4. Only choose action='finish' AFTER you have at least one observation with real data. Provide a concise summary of findings in the 'answer' field (under 150 words).\n"
             "5. DO NOT generate markdown wrapping. Return ONLY the JSON object.\n"
             f"6. Current Iteration: {iteration_count}/5. If you reach iteration 5, you MUST choose 'finish'.\n"
+            "7. CRITICAL: Do NOT call the exact same tool with the exact same arguments if observations are already present in the Observation History. Choose action='finish' once you have retrieved observations.\n"
+            "8. REVISION DIRECTIVE: If a [REFLECTION AGENT CRITIQUE] step is present in the Observation History flagging unsupported claims, you MUST address those claims. If calling a tool, choose a DIFFERENT tool or use a MORE SPECIFIC search query (e.g., search_live_news with specific search keywords) to find supporting evidence. Do NOT repeat the exact same tool and arguments.\n"
         )
 
         prompt = (
@@ -302,8 +339,9 @@ class PolicyAgent:
             "JSON Action:"
         )
 
-        logger.info(f"[Policy Agent] Querying LLM on iteration {iteration_count}...")
-        
+        ollama_timeout = float(os.getenv("OLLAMA_TIMEOUT", "4.0"))
+        logger.info(f"[Policy Agent] Querying LLM on iteration {iteration_count} (Model: '{self.model_name}', Timeout: {ollama_timeout}s)...")
+        fallback_reason = "Unknown Ollama error"
         try:
             from app.utils.async_http import async_post_json
             status_code, data, text = await async_post_json(
@@ -314,40 +352,63 @@ class PolicyAgent:
                     "stream": False,
                     "format": "json",
                     "options": {
-                        "num_predict": 300,
+                        "num_predict": 100,
                         "temperature": 0.0
                     }
                 },
-                timeout=5.0
+                timeout=ollama_timeout
             )
 
             if status_code == 200:
                 raw_text = data.get("response", "").strip()
                 action = parse_and_validate_policy_action(raw_text, tools)
-                logger.info(f"[Policy Agent] Decided action: {action.action} (Valid: {action.is_valid}, Thought: {action.thought})")
-                return action
+                if action.is_valid:
+                    logger.info(f"[Policy Agent] Decided action: {action.action} (Valid: {action.is_valid}, Thought: {action.thought})")
+                    return action
+                else:
+                    fallback_reason = f"LLM output validation failed: {action.validation_error}"
+                    logger.warning(
+                        f"[Policy Agent Warning] LLM response schema validation failed: {action.validation_error}\n"
+                        f"Raw LLM output: {raw_text[:500]}"
+                    )
+            elif status_code == 404:
+                fallback_reason = f"MODEL NOT PULLED: Ollama returned HTTP 404 for model '{self.model_name}'"
+                logger.error(
+                    f"[Policy Agent Error] MODEL NOT PULLED: Ollama returned HTTP 404 for model '{self.model_name}'. "
+                    f"Please pull the model first by running: ollama pull {self.model_name}\nResponse text: {text}"
+                )
             else:
-                logger.warning(f"[Policy Agent] Ollama returned status code: {status_code}")
+                mark_ollama_offline(60.0)
+                fallback_reason = f"Ollama HTTP POST /api/generate failed with status {status_code}: {text[:200]}"
+                logger.error(
+                    f"[Policy Agent Error] Ollama HTTP POST /api/generate failed with status {status_code}.\n"
+                    f"Response text: {text[:500]}"
+                )
         except Exception as e:
-            logger.error(f"[Policy Agent Exception] Ollama query failed: {e}")
+            exc_name = type(e).__name__
+            fallback_reason = f"Ollama call threw {exc_name}: {str(e)}"
+            logger.error(
+                f"[Policy Agent Exception] Ollama /api/generate call threw {exc_name}: {str(e)}\n"
+                f"URL: {OLLAMA_URL}/api/generate | Model: '{self.model_name}'"
+            )
+            import traceback
+            logger.error(f"[Policy Agent Exception Traceback]:\n{traceback.format_exc()}")
 
         # Safe Fallback: Finish with local retrieval if possible, or simple search
-        logger.info("[Policy Agent] Using fallback default action")
+        logger.warning(f"[Policy Agent] Triggering fallback branch due to: {fallback_reason}")
         if iteration_count == 1:
             fallback = PolicyAction(
                 action="tool",
                 tool="search_live_news",
                 arguments={"query": query, "limit": 10},
-                thought="Ollama failed or is offline. Falling back to search_live_news tool.",
+                thought=f"Ollama fallback triggered ({fallback_reason}). Falling back to search_live_news tool.",
                 is_valid=True
             )
         else:
             fallback = PolicyAction(
                 action="finish",
-                # Use sentinel that triggers reflection_node's local synthesizer
-                # which will produce a proper executive briefing from retrieved observations.
                 answer="No detailed information was found.",
-                thought="Ollama offline. Routing to local synthesis from retrieved observations.",
+                thought=f"Ollama fallback triggered ({fallback_reason}). Routing to local synthesis from retrieved observations.",
                 is_valid=True
             )
         return parse_and_validate_policy_action(fallback, tools)

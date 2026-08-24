@@ -1,6 +1,27 @@
 import logging
 from typing import Dict, Any, List
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server.fastmcp import FastMCP
+except ImportError:
+    try:
+        from mcp.server import FastMCP
+    except ImportError:
+        class FastMCP:
+            def __init__(self, name: str):
+                self.name = name
+            def tool(self, *args, **kwargs):
+                def decorator(fn):
+                    return fn
+                return decorator
+            def resource(self, *args, **kwargs):
+                def decorator(fn):
+                    return fn
+                return decorator
+            def prompt(self, *args, **kwargs):
+                def decorator(fn):
+                    return fn
+                return decorator
+
 from app.repositories.news_repository import news_repository
 
 logger = logging.getLogger(__name__)

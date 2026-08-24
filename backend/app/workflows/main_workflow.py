@@ -145,8 +145,15 @@ async def policy_node(state: AgentState) -> AgentState:
         decision.arguments = {"query": query, "limit": 10}
         decision.thought = "Overridden: Must search for data before finishing."
 
-    # Multi-tool support: if Policy Agent requests another tool after observations,
-    # allow it — the agent decides when it has enough data.
+    # Safeguard 2: Prevent duplicate tool call loops. If LLM requests a tool call identical to an existing observation, override to finish immediately.
+    if decision.action == "tool" and state["observations"]:
+        previous_calls = [(obs.get("tool"), obs.get("arguments")) for obs in state["observations"] if obs.get("tool")]
+        if (decision.tool, decision.arguments) in previous_calls and len(state["observations"]) >= 1:
+            logger.warning(f"[Workflow] Duplicate tool call detected ({decision.tool}). Overriding action to 'finish'.")
+            decision.action = "finish"
+            decision.answer = "Synthesized response from collected observations."
+            decision.thought = f"Auto-finished: Data already collected from {decision.tool}."
+
     if decision.action == "tool":
         obs_count = len(state["observations"])
         logger.info(f"[Workflow] Policy Agent selected tool '{decision.tool}' (observation #{obs_count + 1}).")
@@ -289,16 +296,21 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
                     url = item.get("url", "#")
                     category = item.get("category", "")
                     published_date = item.get("published_date", "")
+                    art_dict = {
+                        "title": title,
+                        "content": content,
+                        "cleaned_content": content,
+                        "source": source,
+                        "url": url,
+                        "category": category,
+                        "published_date": published_date
+                    }
+                    if source1_val and source1_val.lower() in source.lower():
+                        art_dict["comparison_source"] = source1_val
+                    elif source2_val and source2_val.lower() in source.lower():
+                        art_dict["comparison_source"] = source2_val
                     if title:
-                        articles.append({
-                            "title": title,
-                            "content": content,
-                            "cleaned_content": content,
-                            "source": source,
-                            "url": url,
-                            "category": category,
-                            "published_date": published_date
-                        })
+                        articles.append(art_dict)
         elif isinstance(result, dict):
             s1 = result.get("source1")
             s2 = result.get("source2")
@@ -310,46 +322,57 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
                 if isinstance(item, dict):
                     t1 = item.get("source1_title") or item.get("title") or ""
                     if t1:
+                        sum1 = item.get("source1_summary") or item.get("summary") or t1
                         articles.append({
                             "title": t1,
-                            "content": item.get("summary") or t1,
-                            "cleaned_content": item.get("summary") or t1,
+                            "content": sum1,
+                            "cleaned_content": sum1,
                             "source": s1 or "Source 1",
                             "comparison_source": s1 or "Source 1",
                             "url": item.get("source1_url", "#")
                         })
                     t2 = item.get("source2_title") or ""
                     if t2:
+                        sum2 = item.get("source2_summary") or t2
                         articles.append({
                             "title": t2,
-                            "content": item.get("summary") or t2,
-                            "cleaned_content": item.get("summary") or t2,
+                            "content": sum2,
+                            "cleaned_content": sum2,
                             "source": s2 or "Source 2",
                             "comparison_source": s2 or "Source 2",
                             "url": item.get("source2_url", "#")
                         })
             for item in result.get("exclusive_source1", []):
                 if isinstance(item, dict) and item.get("title"):
+                    cnt = item.get("content") or item.get("title")
+                    item_src = item.get("source") or s1 or "Source 1"
                     articles.append({
+                        "id": item.get("id"),
                         "title": item["title"],
-                        "content": item.get("title"),
-                        "cleaned_content": item.get("title"),
-                        "source": s1 or "Source 1",
+                        "content": cnt,
+                        "cleaned_content": cnt,
+                        "source": item_src,
                         "comparison_source": s1 or "Source 1",
                         "url": item.get("url", "#")
                     })
             for item in result.get("exclusive_source2", []):
                 if isinstance(item, dict) and item.get("title"):
+                    cnt = item.get("content") or item.get("title")
+                    item_src = item.get("source") or s2 or "Source 2"
                     articles.append({
+                        "id": item.get("id"),
                         "title": item["title"],
-                        "content": item.get("title"),
-                        "cleaned_content": item.get("title"),
-                        "source": s2 or "Source 2",
+                        "content": cnt,
+                        "cleaned_content": cnt,
+                        "source": item_src,
                         "comparison_source": s2 or "Source 2",
                         "url": item.get("url", "#")
                     })
 
+            has_exclusive = "exclusive_source1" in result or "exclusive_source2" in result
             for key in ["articles", "results", "data", "recent_articles"]:
+                if has_exclusive and key == "articles":
+                    continue
                 if isinstance(result.get(key), list):
                     for item in result[key]:
                         if isinstance(item, dict):
@@ -359,17 +382,22 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
                             url = item.get("url", "#")
                             category = item.get("category", "")
                             published_date = item.get("published_date", "")
+                            art_dict = {
+                                "title": title,
+                                "content": content,
+                                "cleaned_content": content,
+                                "source": source,
+                                "url": url,
+                                "category": category,
+                                "published_date": published_date
+                            }
+                            if source1_val and source1_val.lower() in source.lower():
+                                art_dict["comparison_source"] = source1_val
+                            elif source2_val and source2_val.lower() in source.lower():
+                                art_dict["comparison_source"] = source2_val
                             if title:
-                                articles.append({
-                                    "title": title,
-                                    "content": content,
-                                    "cleaned_content": content,
-                                    "source": source,
-                                    "url": url,
-                                    "category": category,
-                                    "published_date": published_date
-                                })
-    
+                                articles.append(art_dict)
+
     try:
         if not articles:
             # Extract title from query quotes if available
@@ -409,13 +437,34 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
 
 # Reflection node
 async def reflection_node(state: AgentState) -> AgentState:
-    from app.agents.reflection_agent import REFLECTION_STATUS_UNVERIFIED, REFLECTION_STATUS_REVISED
+    from app.agents.reflection_agent import ReflectionReport, REFLECTION_STATUS_VERIFIED, REFLECTION_STATUS_UNVERIFIED, REFLECTION_STATUS_REVISED
     query = state["query"]
     answer = state.get("action_answer", "")
     history = state.get("observations", [])
+    retrieved = state.get("retrieved_documents", [])
 
-    # Run reflection
-    report = await reflection_agent.reflect(query=query, answer=answer, history=history)
+    # Pre-synthesis: if answer is generic or a sentinel placeholder, synthesize grounded briefing first
+    is_raw_list    = bool(answer and answer.startswith("Summary:") and len(answer.split("\n")) <= 2)
+    is_generic     = bool(
+        not answer 
+        or answer in ["No response generated.", "No detailed information was found.", "Synthesized response from collected observations.", "Synthesized response from retrieved observations."]
+        or answer.startswith("Synthesized response")
+    )
+    is_blank_summary = bool(answer and re.search(r'\*\*Key Summary:\*\*\s*(?:---|#|\*\*Primary Source Links:\*\*|\s*$)', answer))
+
+    if (is_generic or is_raw_list or is_blank_summary) and (history or retrieved):
+        synth_docs = retrieved if retrieved else []
+        if synth_docs:
+            from app.agents.response import synthesize_executive_summary
+            answer = synthesize_executive_summary(query, synth_docs[:5], llm_summary=None, intent=state.get("intent", ""))
+        else:
+            answer = _synthesize_from_observations(query, history, intent=state.get("intent", ""))
+        state["action_answer"] = answer
+
+    # Always call reflection_agent.reflect() on the final answer — never hardcode verdict.
+    # Uses cheap deterministic pre-check (<1ms) when skip_llm_if_grounded=True, or full reflection when skip_llm_if_grounded=False.
+    report = await reflection_agent.reflect(query=query, answer=answer, history=history, skip_llm_if_grounded=False)
+
     state["reflection_report"] = report.model_dump() if hasattr(report, "model_dump") else report.dict()
 
     reflection_status = report.reflection_status
@@ -451,20 +500,6 @@ async def reflection_node(state: AgentState) -> AgentState:
         })
     else:
         resp_str  = answer
-        retrieved = state.get("retrieved_documents", [])
-
-        # Check if LLM output is generic, missing, single-line, or contains an empty Key Summary template
-        is_raw_list    = bool(resp_str and resp_str.startswith("Summary:") and len(resp_str.split("\n")) <= 2)
-        is_generic     = bool(not resp_str or resp_str in ["No response generated.", "No detailed information was found."])
-        is_blank_summary = bool(resp_str and re.search(r'\*\*Key Summary:\*\*\s*(?:---|#|\*\*Primary Source Links:\*\*|\s*$)', resp_str))
-
-        if (is_generic or is_raw_list or is_blank_summary) and (history or retrieved):
-            synth_docs = retrieved if retrieved else []
-            if synth_docs:
-                from app.agents.response import synthesize_executive_summary
-                resp_str = synthesize_executive_summary(query, synth_docs[:5], llm_summary=None, intent=state.get("intent", ""))
-            else:
-                resp_str = _synthesize_from_observations(query, history, intent=state.get("intent", ""))
 
         if not resp_str:
             resp_str = "No response generated."

@@ -10,9 +10,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
+from pydantic import BaseModel, model_validator
+
 class ChatRequest(BaseModel):
-    query: str
+    query: Optional[str] = None
+    message: Optional[str] = None
+    prompt: Optional[str] = None
     user_id: Optional[str] = "default_user"
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_input_query(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            q = data.get("query") or data.get("message") or data.get("prompt") or ""
+            data["query"] = str(q).strip()
+        return data
 
 class ChatResponse(BaseModel):
     response: str

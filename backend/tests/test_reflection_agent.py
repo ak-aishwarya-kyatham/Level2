@@ -160,6 +160,7 @@ async def test_3_reflection_detects_unsupported_claim():
             query="What was the investment amount for India's AI mission?",
             answer="India's AI mission received 500 billion dollars in investment.",
             history=SAMPLE_HISTORY_WITH_DATA,
+            skip_llm_if_grounded=False,
         )
 
     assert report.revise is True
@@ -180,6 +181,7 @@ async def test_4_llm_failure_triggers_deterministic_fallback():
             query="India tech news",
             answer=GROUNDED_ANSWER,
             history=SAMPLE_HISTORY_WITH_DATA,
+            skip_llm_if_grounded=False,
         )
 
     # Fallback must have been invoked

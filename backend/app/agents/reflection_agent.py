@@ -218,13 +218,22 @@ class ReflectionAgent:
         self,
         query:   str,
         answer:  str,
-        history: List[Dict[str, Any]]
+        history: List[Dict[str, Any]],
+        skip_llm_if_grounded: bool = True
     ) -> ReflectionReport:
         """
         Evaluate answer against observations in history.
 
-        Success path  → LLM-generated structured critique → VERIFIED / REVISED.
-        Failure path  → deterministic local verifier      → VERIFIED / UNVERIFIED.
+        1. Fast Deterministic Pre-check Stage:
+           Runs local token-overlap verifier first (<1ms).
+           If all claims are verified grounded and no unsupported claims exist, returns VERIFIED immediately.
+
+        2. Full LLM Reflection Stage:
+           If questionable or ungrounded claims are found (or if skip_llm_if_grounded=False),
+           escalates to Ollama LLM for deep contextual critique.
+
+        3. Deterministic Fallback:
+           If LLM is offline or times out, uses the deterministic report.
         """
         if not history:
             # Nothing to reflect on — but we must not claim the answer is verified.
@@ -238,6 +247,31 @@ class ReflectionAgent:
                 reflection_status=REFLECTION_STATUS_UNVERIFIED,
                 fallback_used=False,
             )
+
+        # Check if Ollama circuit breaker is active from a previous timeout
+        from app.agents.policy_agent import is_ollama_circuit_open, mark_ollama_offline
+        if is_ollama_circuit_open():
+            logger.info("[Reflection Agent] Circuit breaker active — skipping LLM wait and running fast deterministic verifier.")
+            return self._deterministic_fallback_verify(answer, history, query)
+
+        # ------------------------------------------------------------------
+        # Fast Deterministic Pre-check Stage (<1ms latency)
+        # ------------------------------------------------------------------
+        if skip_llm_if_grounded:
+            fast_report = self._deterministic_fallback_verify(answer, history, query)
+            # If deterministic verifier cleanly confirms all sentences are grounded without any unsupported claims,
+            # return VERIFIED immediately (<1ms latency).
+            if not fast_report.revise and fast_report.reflection_status == REFLECTION_STATUS_VERIFIED and not fast_report.unsupported_claims:
+                obs_tokens = self._extract_observation_tokens(history, query=query)
+                ans_tokens = set(re.findall(r"\b[a-z]{3,}\b", answer.lower()))
+                overlap_ratio = len(ans_tokens.intersection(obs_tokens)) / max(1, len(ans_tokens))
+                if overlap_ratio >= 0.25:
+                    logger.info(
+                        f"[Reflection Agent] Fast deterministic pre-check PASSED ({len(fast_report.supported_claims)} claim(s) grounded, overlap={overlap_ratio:.2f}). "
+                        f"Bypassing LLM reflection call."
+                    )
+                    fast_report.fallback_used = False
+                    return fast_report
 
         # Build observations string for LLM prompt
         observations_str = ""
@@ -256,12 +290,27 @@ class ReflectionAgent:
                         items_str.append(str(item)[:150])
                 observations_str += (
                     f"Observation {idx} (from tool '{step.get('tool')}'):\n"
-                    + "\n".join(items_str[:15]) + "\n\n"
+                    + "\n".join(items_str[:10]) + "\n\n"
+                )
+            elif isinstance(res, dict):
+                items_str = []
+                for key in ["common_news", "exclusive_source1", "exclusive_source2", "articles", "results"]:
+                    val = res.get(key)
+                    if isinstance(val, list):
+                        for item in val[:5]:
+                            if isinstance(item, dict):
+                                t = item.get("title") or item.get("source1_title") or ""
+                                if t: items_str.append(f"- {t}")
+                if not items_str:
+                    items_str.append(str(res)[:400])
+                observations_str += (
+                    f"Observation {idx} (from tool '{step.get('tool')}'):\n"
+                    + "\n".join(items_str[:10]) + "\n\n"
                 )
             else:
                 observations_str += (
                     f"Observation {idx} (from tool '{step.get('tool')}'):\n"
-                    f"{str(res)[:1000]}\n\n"
+                    f"{str(res)[:400]}\n\n"
                 )
 
         system_prompt = (
@@ -288,8 +337,9 @@ class ReflectionAgent:
             "JSON Reflection Report:"
         )
 
-        logger.info("[Reflection Agent] Analyzing generated response for hallucinations...")
-
+        ollama_timeout = float(os.getenv("OLLAMA_TIMEOUT", "4.0"))
+        logger.info(f"[Reflection Agent] Analyzing generated response for hallucinations (Model: '{self.model_name}', Timeout: {ollama_timeout}s)...")
+        fallback_reason = "Unknown Ollama error"
         try:
             from app.utils.async_http import async_post_json
             status_code, data, text = await async_post_json(
@@ -304,7 +354,7 @@ class ReflectionAgent:
                         "temperature": 0.0
                     }
                 },
-                timeout=3.0
+                timeout=ollama_timeout
             )
 
             if status_code == 200:
@@ -325,28 +375,41 @@ class ReflectionAgent:
                     )
                     return report
                 except (json.JSONDecodeError, ValidationError) as parse_err:
+                    fallback_reason = f"Malformed LLM JSON: {parse_err}"
                     logger.warning(
-                        f"[Reflection Agent] Malformed LLM JSON: {raw_text[:200]}. "
+                        f"[Reflection Agent Warning] Malformed LLM JSON output: {raw_text[:200]}. "
                         f"Error: {parse_err}. Falling back to deterministic verifier."
                     )
+            elif status_code == 404:
+                fallback_reason = f"MODEL NOT PULLED: Ollama returned HTTP 404 for model '{self.model_name}'"
+                logger.error(
+                    f"[Reflection Agent Error] MODEL NOT PULLED: Ollama returned HTTP 404 for model '{self.model_name}'. "
+                    f"Please run 'ollama pull {self.model_name}'. Response text: {text}"
+                )
             else:
+                fallback_reason = f"Ollama HTTP POST /api/generate failed with status {status_code}: {text[:200]}"
                 logger.warning(
-                    f"[Reflection Agent] Ollama returned status {response.status_code}. "
-                    f"Falling back to deterministic verifier."
+                    f"[Reflection Agent Error] Ollama returned status {status_code}. "
+                    f"Response text: {text[:500]}. Falling back to deterministic verifier."
                 )
 
         except Exception as e:
+            exc_name = type(e).__name__
+            fallback_reason = f"Ollama /api/generate threw {exc_name}: {str(e)}"
             logger.error(
-                f"[Reflection Agent Exception] Ollama query failed: {e}. "
+                f"[Reflection Agent Exception] Ollama /api/generate call threw {exc_name}: {str(e)}. "
+                f"URL: {OLLAMA_URL}/api/generate | Model: '{self.model_name}'\n"
                 f"Falling back to deterministic verifier."
             )
+            import traceback
+            logger.error(f"[Reflection Agent Exception Traceback]:\n{traceback.format_exc()}")
 
         # ----------------------------------------------------------------
         # FAIL-SAFE: LLM unavailable — run deterministic verifier.
         # This NEVER silently returns revise=False / VERIFIED without evidence.
         # ----------------------------------------------------------------
         logger.warning(
-            "[Reflection Agent] LLM unavailable. Running conservative deterministic verifier. "
+            f"[Reflection Agent] LLM unavailable due to: {fallback_reason}. Running conservative deterministic verifier. "
             "Result will be UNVERIFIED if claims cannot be grounded."
         )
         return self._deterministic_fallback_verify(answer=answer, history=history, query=query)

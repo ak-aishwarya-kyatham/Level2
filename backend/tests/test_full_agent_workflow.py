@@ -89,7 +89,7 @@ class DeterministicWorkflowSimulator:
                 is_valid=True
             )
 
-    async def fake_reflection_reflect(self, query: str, answer: str, history: list):
+    async def fake_reflection_reflect(self, query: str, answer: str, history: list, *args, **kwargs):
         self.reflection_calls += 1
         if self.reflection_calls == 1:
             # Turn 1 Reflection: Output critique with revise=True

@@ -202,7 +202,7 @@ async def test_max_iterations_safety():
         return PolicyAction(
             action="tool",
             tool="search_live_news",
-            arguments={"query": "infinite loop test"},
+            arguments={"query": f"infinite loop test {called_count[0]}"},
             thought=f"Calling tool again (call #{called_count[0]})",
             answer=""
         )
@@ -305,7 +305,7 @@ class FakeOllamaLLM:
         response_data = {}
 
         # 1. Reflection Agent Call
-        if "Reflection Agent" in prompt or "JSON Reflection Report:" in prompt:
+        if "You are a Reflection Agent" in prompt or "JSON Reflection Report:" in prompt:
             self.reflection_decisions_count += 1
             if self.reflection_decisions_count == 1:
                 # Turn 1 Reflection: Critique answer and trigger revision
@@ -341,7 +341,7 @@ class FakeOllamaLLM:
             has_no_obs = "No tools have been called yet" in prompt
             has_obs_1 = ("Step 1:" in prompt or "India Tech Boom" in prompt) and not has_no_obs
             has_obs_2 = "total_articles" in prompt or "Step 2:" in prompt
-            has_critique = "reflection_critique" in prompt or "Please revise" in prompt
+            has_critique = any(f"Step {i} [REFLECTION AGENT CRITIQUE" in prompt for i in range(1, 10)) or "reflection_critique" in prompt or "Please revise" in prompt
 
             if has_obs_1 and not has_no_obs:
                 self.history_received = True

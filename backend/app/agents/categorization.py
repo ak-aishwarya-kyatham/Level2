@@ -32,7 +32,7 @@ class CategorizationAgent:
             return "Technology"
         elif self._matches_keywords(text_lower, ["climate", "environment", "pollution", "solar", "renewable", "carbon", "emissions", "green energy", "nature"]):
             return "Environment"
-        elif self._matches_keywords(text_lower, ["stock", "market", "economy", "bank", "billion", "inflation", "finance", "business", "tax", "earnings", "invest", "gdp"]):
+        elif self._matches_keywords(text_lower, ["stock", "stocks", "market", "markets", "economy", "economies", "bank", "banks", "billion", "inflation", "finance", "finances", "business", "tax", "earnings", "invest", "investor", "investors", "investment", "investments", "gdp"]):
             return "Business"
         elif self._matches_keywords(text_lower, ["cricket", "football", "match", "cup", "game", "tournament", "olympics", "nba", "tennis", "win", "scored", "champion"]):
             return "Sports"

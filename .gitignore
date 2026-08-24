@@ -37,3 +37,6 @@ Thumbs.db
 backend/test_*.py
 backend/test_*.txt
 backend/scratch/
+scratch/
+FRESH_TEST_RUN.txt
+test_output.txt

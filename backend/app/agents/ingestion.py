@@ -26,6 +26,8 @@ class NewsIngestionAgent:
             "BBC News": "http://feeds.bbci.co.uk/news/rss.xml",
             "BBC Tech": "http://feeds.bbci.co.uk/news/technology/rss.xml",
             "TechCrunch": "https://techcrunch.com/feed/",
+            "VentureBeat": "https://venturebeat.com/feed/",
+            "VentureBeat AI": "https://venturebeat.com/category/ai/feed/",
             "Economic Times": "https://economictimes.indiatimes.com/rssfeedstopstories.cms",
             "NDTV News": "https://feeds.feedburner.com/ndtvnews-top-stories",
             "Google News": "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",

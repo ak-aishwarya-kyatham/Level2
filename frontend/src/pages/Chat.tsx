@@ -57,10 +57,14 @@ export default function Chat() {
     setLoading(true);
 
     try {
-      const response = await apiClient.post("/api/chat/", {
-        query: queryToSend,
-        user_id: "default_user",
-      });
+      const response = await apiClient.post(
+        "/api/chat/",
+        {
+          query: queryToSend,
+          user_id: "default_user",
+        },
+        { timeout: 300000 }
+      );
 
       setMessages((prev) => [
         ...prev,
