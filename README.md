@@ -114,26 +114,17 @@ You can run the entire frontend and backend directly on your host machine. The b
 
 ## 🧪 Testing & Quality Assurance
 
-### Test Results
-
-Verified test run execution against `backend/` test suite:
-
-- **Passed**: 83
-- **Failed**: 6
-- **Live Tests Deselected**: 1 (marked with `@pytest.mark.live` and excluded by default via `-m "not live"`)
-- **Total Tests Collected**: 90
-- **Test Command**: `python -m pytest -q`
-
-> **Note**: Live integration tests targeting a running local Ollama instance are deselected by default in `pyproject.toml` (`addopts = "-m \"not live\""`) so offline environments can execute the standard test suite without external daemons.
-
 ### Exact Test Commands
 
-To run tests and generate traces from the `backend/` directory:
+To run the standard offline test suite (excluding live external service dependencies), navigate to the `backend/` directory and execute:
 
 ```bash
-# Standard Offline Suite
 python -m pytest -q -p no:cacheprovider
+```
 
+To run specific test categories or traces independently:
+
+```bash
 # Category 1: Unit Tests Only (Isolated Mocks, Zero External Services)
 python -m pytest -m unit -q -p no:cacheprovider
 
@@ -152,6 +143,18 @@ python scripts/verify_live_trace.py
 # Category 6: Optional Live Ollama Pytest Suite
 python -m pytest -m live -q -p no:cacheprovider
 ```
+
+### Test Results
+
+Verified test run execution against `backend/` test suite:
+
+- **Passed**: 83
+- **Failed**: 6
+- **Live Tests Deselected**: 1 (marked with `@pytest.mark.live` and excluded by default via `-m "not live"`)
+- **Total Tests Collected**: 90
+- **Test Command**: `python -m pytest -q`
+
+> **Note**: Live integration tests targeting a running local Ollama instance are deselected by default in `pyproject.toml` (`addopts = "-m \"not live\""`) so offline environments can execute the standard test suite without external daemons.
 
 ### Test Categorization Architecture
 
