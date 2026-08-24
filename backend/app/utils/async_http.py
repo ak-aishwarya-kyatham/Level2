@@ -48,7 +48,7 @@ async def async_post_json(url: str, payload: dict, timeout: float) -> Tuple[int,
             return status_code, data, text
     except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectTimeout) as t_err:
         logger.warning(f"Async HTTP timeout calling {url}: {t_err}")
-        return 504, {}, f"Request timed out: {t_err}"
+        raise t_err
     except Exception as exc:
         logger.error(f"Async HTTP error calling {url}: {exc}")
-        return 500, {}, f"Request failed: {exc}"
+        raise exc
