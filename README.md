@@ -148,8 +148,8 @@ python -m pytest -m live -q -p no:cacheprovider
 
 Verified test run execution against `backend/` test suite:
 
-- **Passed**: 85
-- **Failed**: 4
+- **Passed**: 86
+- **Failed**: 3
 - **Live Tests Deselected**: 1 (marked with `@pytest.mark.live` and excluded by default via `-m "not live"`)
 - **Total Tests Collected**: 90
 - **Test Command**: `python -m pytest -q`

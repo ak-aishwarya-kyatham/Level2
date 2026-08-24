@@ -231,7 +231,8 @@ async def test_routing_accuracy_benchmark_executes_policy_agent():
         mock_resp.json.return_value = {"response": json.dumps(decision)}
         return mock_resp
 
-    with patch("requests.post", side_effect=mock_ollama_routing_response):
+    with patch("requests.post", side_effect=mock_ollama_routing_response), \
+         patch("app.agents.policy_agent.is_ollama_circuit_open", return_value=False):
         results = await run_routing_benchmark()
 
     # Assert Policy Agent was executed for each query in dataset
