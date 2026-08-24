@@ -437,8 +437,9 @@ async def test_llm_mediated_policy_agent_and_reflection_loop():
             {"name": "get_dashboard_analytics", "description": "Get analytics", "inputSchema": {"type": "object"}},
         ]
 
-    # Patch ONLY requests.post and MCP tools (the system boundaries)
+    # Patch ONLY requests.post, circuit breaker status, and MCP tools (the system boundaries)
     with patch("requests.post", side_effect=fake_ollama), \
+         patch("app.agents.policy_agent.is_ollama_circuit_open", return_value=False), \
          patch("app.workflows.main_workflow.cache_get", return_value=None), \
          patch("app.workflows.main_workflow.mcp_client.call_tool", mock_call_tool), \
          patch("app.workflows.main_workflow.mcp_client.list_available_tools", mock_list_available_tools):
