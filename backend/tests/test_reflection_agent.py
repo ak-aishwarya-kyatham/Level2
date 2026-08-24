@@ -87,7 +87,8 @@ async def test_1_successful_reflection_valid_answer():
 
     agent = ReflectionAgent()
 
-    with patch("requests.post", return_value=mock_resp):
+    with patch("requests.post", return_value=mock_resp), \
+         patch("app.agents.policy_agent.is_ollama_circuit_open", return_value=False):
         report = await agent.reflect(
             query="Tell me about India tech news",
             answer=GROUNDED_ANSWER,
@@ -123,7 +124,8 @@ async def test_2_reflection_detects_hallucination():
 
     agent = ReflectionAgent()
 
-    with patch("requests.post", return_value=mock_resp):
+    with patch("requests.post", return_value=mock_resp), \
+         patch("app.agents.policy_agent.is_ollama_circuit_open", return_value=False):
         report = await agent.reflect(
             query="Tell me about India tech news",
             answer=HALLUCINATED_ANSWER,
@@ -155,7 +157,8 @@ async def test_3_reflection_detects_unsupported_claim():
 
     agent = ReflectionAgent()
 
-    with patch("requests.post", return_value=mock_resp):
+    with patch("requests.post", return_value=mock_resp), \
+         patch("app.agents.policy_agent.is_ollama_circuit_open", return_value=False):
         report = await agent.reflect(
             query="What was the investment amount for India's AI mission?",
             answer="India's AI mission received 500 billion dollars in investment.",

@@ -148,11 +148,11 @@ python -m pytest -m live -q -p no:cacheprovider
 
 Verified test run execution against `backend/` test suite:
 
-- **Passed**: 86
-- **Failed**: 3
+- **Passed**: 89
+- **Failed**: 0
 - **Live Tests Deselected**: 1 (marked with `@pytest.mark.live` and excluded by default via `-m "not live"`)
 - **Total Tests Collected**: 90
-- **Test Command**: `python -m pytest -q`
+- **Test Command**: `python -m pytest -q -p no:cacheprovider`
 
 > **Note**: Live integration tests targeting a running local Ollama instance are deselected by default in `pyproject.toml` (`addopts = "-m \"not live\""`) so offline environments can execute the standard test suite without external daemons.
 
