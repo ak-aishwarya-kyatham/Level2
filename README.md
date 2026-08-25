@@ -9,9 +9,7 @@ Powered by a **Model Context Protocol (MCP)** server-client architecture over st
 ## 📚 Project Documentation Suite
 
 - **[Software Requirements Specification (SRS)](docs/SRS.md)**: Functional, non-functional, and compliance requirements.
-- **[Technical Reference Specification (TRS)](docs/TRS.md)**: Deep architectural design, MCP protocol specifications, LangGraph state machine transitions, and evaluation math.
-- **[Agent & Contributor Guidelines (AGENTS.md)](AGENTS.md)**: Rules of engagement, repository hygiene, scratch folder conventions, and documentation synchronization rules.
-- **[L2 Course Syllabus Alignment](docs/l2.md)**: Course syllabus mapping and rubric alignment.
+- **[Technical Reference Specification (TRS)](docs/TRS.md)**: Deep architectural design, MCP protocol specifications, LangGraph state machine transitions, and evaluation formulas.
 
 ---
 
