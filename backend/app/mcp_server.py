@@ -36,8 +36,9 @@ async def search_live_news(query: str = "", category: str = "", source: str = ""
     """
     MCP Tool: Search indexed live news articles, location trends, or topic news (e.g. Telangana, India, Artificial Intelligence). MUST be used for all topic, state, or location queries.
     """
-    logger.info(f"[MCP Tool: search_live_news] Query: '{query}', Category: '{category}', Source: '{source}'")
-    return await news_repository.search_articles(query=query, category=category, source=source, limit=limit)
+    safe_limit = max(1, min(int(limit) if isinstance(limit, (int, float)) else 20, 50))
+    logger.info(f"[MCP Tool: search_live_news] Query: '{query}', Category: '{category}', Source: '{source}', Limit: {safe_limit}")
+    return await news_repository.search_articles(query=query, category=category, source=source, limit=safe_limit)
 
 @mcp_server.tool()
 async def fetch_latest_rss_feeds() -> Dict[str, Any]:
@@ -73,8 +74,9 @@ async def get_articles_by_category(category: str = "", limit: int = 20) -> List[
     """
     MCP Tool: Retrieve live news articles matching exact category strictly.
     """
-    logger.info(f"[MCP Tool: get_articles_by_category] Category: '{category}'")
-    return await news_repository.get_articles_by_category(category=category, limit=limit)
+    safe_limit = max(1, min(int(limit) if isinstance(limit, (int, float)) else 20, 50))
+    logger.info(f"[MCP Tool: get_articles_by_category] Category: '{category}', Limit: {safe_limit}")
+    return await news_repository.get_articles_by_category(category=category, limit=safe_limit)
 
 @mcp_server.resource("news://store/articles")
 def get_articles_resource() -> List[Dict[str, Any]]:

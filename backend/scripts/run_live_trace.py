@@ -78,9 +78,16 @@ async def run_live_trace():
     query = "Compare news coverage of AI developments across top media sources"
     log_step(f"USER QUERY:\n-> {query}\n")
 
-    # 1. Connect real MCP Client Session (spawns real MCP server)
+    # 1. Connect real MCP Client Session (spawns real FastMCP server via stdio transport)
     await mcp_client.start()
+    if not mcp_client.is_connected:
+        print("[ERROR] MCP Client could not establish stdio ClientSession with FastMCP server.")
+        sys.exit(1)
+
     tools = await mcp_client.list_available_tools()
+    discovered_names = [t.get("name") for t in tools if t.get("name")]
+    log_step(f"MCP TRANSPORT: stdio ClientSession (Active: {mcp_client.is_connected})")
+    log_step(f"DISCOVERED TOOLS FROM SERVER: {discovered_names}\n")
 
     # 2. Multi-iteration Policy & Reflection Loop (Max 3 iterations total: 1 initial + 2 revisions)
     policy_agent = PolicyAgent()

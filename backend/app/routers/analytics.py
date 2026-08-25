@@ -1,7 +1,7 @@
 import os
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter
 from app.mcp_client import mcp_client
 
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 async def get_analytics_metrics():
     """Route analytics metrics request via MCP resource 'news://analytics/metrics' with fallback to repository."""
     try:
-        if mcp_client.is_connected and mcp_client.session is not None:
+        if mcp_client.is_connected:
             return await mcp_client.read_resource("news://analytics/metrics")
     except Exception:
         pass
@@ -79,7 +79,7 @@ async def run_evaluation_benchmark():
         "tool_calls": routing_res.get("tool_calls", []),
         "test_cases": routing_res.get("test_cases", []),
         "metrics": eval_res,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
     return {

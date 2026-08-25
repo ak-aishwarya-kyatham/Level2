@@ -1,6 +1,9 @@
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _utc_now():
+    return datetime.now(timezone.utc)
 
 class NewsArticleBase(BaseModel):
     title: str
@@ -17,6 +20,6 @@ class NewsArticle(NewsArticleBase):
     chunks: Optional[List[str]] = None
     embedding: Optional[List[float]] = None
     is_duplicate: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
 
     model_config = ConfigDict(populate_by_name=True)

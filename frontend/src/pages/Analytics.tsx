@@ -6,7 +6,6 @@ import {
   RefreshCw, 
   TrendingUp, 
   ShieldAlert, 
-  Zap, 
   Cpu, 
   FileText, 
   CheckCircle2, 

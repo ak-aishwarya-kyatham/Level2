@@ -2,8 +2,8 @@ from langgraph.graph import StateGraph, END
 import logging
 import time
 import re
-from typing import Dict, Any
-from datetime import datetime
+import json
+from datetime import datetime, timezone
 
 from app.workflows.langgraph_state import AgentState
 from app.agents.policy_agent import PolicyAgent
@@ -147,8 +147,14 @@ async def policy_node(state: AgentState) -> AgentState:
 
     # Safeguard 2: Prevent duplicate tool call loops. If LLM requests a tool call identical to an existing observation, override to finish immediately.
     if decision.action == "tool" and state["observations"]:
-        previous_calls = [(obs.get("tool"), obs.get("arguments")) for obs in state["observations"] if obs.get("tool")]
-        if (decision.tool, decision.arguments) in previous_calls and len(state["observations"]) >= 1:
+        def _canon_args(a):
+            if isinstance(a, dict):
+                return json.dumps(a, sort_keys=True)
+            return str(a)
+        
+        current_canon = (decision.tool, _canon_args(decision.arguments))
+        previous_calls = [(obs.get("tool"), _canon_args(obs.get("arguments"))) for obs in state["observations"] if obs.get("tool")]
+        if current_canon in previous_calls and len(state["observations"]) >= 1:
             logger.warning(f"[Workflow] Duplicate tool call detected ({decision.tool}). Overriding action to 'finish'.")
             decision.action = "finish"
             decision.answer = "Synthesized response from collected observations."
@@ -565,7 +571,7 @@ async def reflection_node(state: AgentState) -> AgentState:
             news_repository.record_evaluation_run({
                 "query": query,
                 "metrics": metrics,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             })
         except Exception as ex_eval:
             logger.warning(f"Could not record evaluation run: {ex_eval}")

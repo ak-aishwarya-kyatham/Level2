@@ -3,7 +3,7 @@ import logging
 import feedparser
 import urllib.parse
 from typing import List, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from app.schemas.news import NewsArticleBase
 
@@ -43,9 +43,9 @@ class NewsIngestionAgent:
             elif hasattr(entry, 'updated'):
                 pub_date = parsedate_to_datetime(entry.updated)
             else:
-                pub_date = datetime.utcnow()
+                pub_date = datetime.now(timezone.utc)
         except Exception:
-            pub_date = datetime.utcnow()
+            pub_date = datetime.now(timezone.utc)
 
         content = getattr(entry, 'description', '') or getattr(entry, 'summary', '') or getattr(entry, 'title', 'Live news update.')
         title = getattr(entry, 'title', 'Untitled News Article')
@@ -104,9 +104,9 @@ class NewsIngestionAgent:
                     if hasattr(entry, 'published'):
                         pub_date = parsedate_to_datetime(entry.published)
                     else:
-                        pub_date = datetime.utcnow()
+                        pub_date = datetime.now(timezone.utc)
                 except Exception:
-                    pub_date = datetime.utcnow()
+                    pub_date = datetime.now(timezone.utc)
 
                 source_title = "Google News"
                 if hasattr(entry, 'source') and hasattr(entry.source, 'title'):

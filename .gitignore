@@ -19,24 +19,42 @@ env/
 htmlcov/
 *.log
 
-# Databases / Data
+# Databases / Big Data Stores (Exclude large JSON stores from Git)
 mongodb_data/
 redis_data/
 qdrant_data/
 ollama_data/
 backend/app/data/articles_store.json
+backend/app/data/evaluation_runs_store.json
+backend/app/data/evaluation_runs_store.legacy.json
+backend/app/data/agent_execution_logs.json
+backend/app/repositories/live_news_store.json
+backend/app/data/*.json
+!backend/app/data/eval_dataset.json
 
-# IDE / System
+# IDE / Editor / System
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 .gemini/
 
-# Temporary test scripts
-backend/test_*.py
-backend/test_*.txt
+# GitHub Workflows & Actions (No workflow directory)
+.github/
+
+# Temporary / Scratch / Debug Directories & Scripts
 backend/scratch/
 scratch/
+backend/test_*.py
+backend/test_*.txt
 FRESH_TEST_RUN.txt
 test_output.txt
+*.tmp
+
+# Review Reports & Course Material (Keep repository clean of review notes)
+docs/reviews/
+docs/reviews/*
+docs/*review*.md
+*REVIEW_REPORT*.md
+docs/l2.md
+AGENTS.md

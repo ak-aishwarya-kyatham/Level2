@@ -4,7 +4,7 @@ import logging
 import re
 import hashlib
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.schemas.news import NewsArticleBase, NewsArticle
 from app.agents.ingestion import NewsIngestionAgent as IngestionAgent
@@ -117,8 +117,8 @@ class NewsRepository:
         if not isinstance(run_data, dict):
             return
         run_entry = {
-            "run_id": run_data.get("run_id") or f"run_{int(datetime.utcnow().timestamp() * 1000)}",
-            "timestamp": run_data.get("timestamp") or datetime.utcnow().isoformat(),
+            "run_id": run_data.get("run_id") or f"run_{int(datetime.now(timezone.utc).timestamp() * 1000)}",
+            "timestamp": run_data.get("timestamp") or datetime.now(timezone.utc).isoformat(),
             "query": run_data.get("query", ""),
             "model_name": run_data.get("model_name", os.getenv("OLLAMA_MODEL", "qwen2.5:3b")),
             "tool_calls": run_data.get("tool_calls", []),
@@ -134,7 +134,7 @@ class NewsRepository:
             "agent": agent,
             "latency_ms": round(float(latency_ms), 1),
             "success": bool(success),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         self.agent_execution_logs.append(log_entry)
         self._save_agent_logs_to_disk()
@@ -181,7 +181,7 @@ class NewsRepository:
                 "category": category,
                 "chunks": chunks,
                 "published_date": item.published_date.isoformat() if isinstance(item.published_date, datetime) else str(item.published_date),
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
 
             self.articles.append(article_dict)
@@ -330,7 +330,7 @@ class NewsRepository:
                     "category": mapped_category,
                     "chunks": [cleaned_text],
                     "published_date": item.published_date.isoformat() if isinstance(item.published_date, datetime) else str(item.published_date),
-                    "created_at": datetime.utcnow().isoformat()
+                    "created_at": datetime.now(timezone.utc).isoformat()
                 }
                 self.articles.append(art_dict)
                 existing_urls.add(item.url)
@@ -455,7 +455,7 @@ class NewsRepository:
                             "category": cat,
                             "chunks": [cleaned_text],
                             "published_date": item.published_date.isoformat() if isinstance(item.published_date, datetime) else str(item.published_date),
-                            "created_at": datetime.utcnow().isoformat()
+                            "created_at": datetime.now(timezone.utc).isoformat()
                         }
                         self.articles.append(art_dict)
                         existing_urls.add(item.url)

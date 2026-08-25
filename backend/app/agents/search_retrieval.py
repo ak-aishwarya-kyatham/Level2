@@ -1,17 +1,19 @@
+"""
+Search & Retrieval Helper Utilities
+Note: Dynamic multi-tool dispatch in L2 is handled via PolicyAgent + tool_node (MCP Client).
+The legacy retrieval_agent is preserved for auxiliary fallback and standalone test compatibility.
+"""
 import logging
 import re
+from datetime import datetime, timezone
 from app.workflows.langgraph_state import AgentState
 from app.mcp_client import mcp_client
-from app.database.qdrant import QdrantManager
-from app.agents.embedding import EmbeddingAgent
 
 logger = logging.getLogger(__name__)
 
-qdrant_manager = QdrantManager()
-embedding_agent = EmbeddingAgent()
-
 def search_agent(state: AgentState) -> AgentState:
-    logger.info("Search Agent processing request via MCP Client...")
+    """Deprecated stub: Replaced by MCP tool_node."""
+    logger.debug("[Deprecated] search_agent stub called.")
     return state
 
 def extract_topic_filter(query: str) -> str:
@@ -104,7 +106,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
                                     "language": item.language,
                                     "category": cat,
                                     "published_date": item.published_date.isoformat() if hasattr(item.published_date, 'isoformat') else str(item.published_date),
-                                    "created_at": datetime.utcnow().isoformat()
+                                    "created_at": datetime.now(timezone.utc).isoformat()
                                 }
                                 news_repository.articles.append(art_dict)
                                 matching_arts.append(art_dict)
@@ -528,7 +530,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
         score += src_score * 2.0
         
         # 8. Publication recency (freshness)
-        hours_old = dup_agent.date_diff_hours(art.get("published_date"), datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
+        hours_old = dup_agent.date_diff_hours(art.get("published_date"), datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
         if hours_old < 12:
             score += 3.0
         elif hours_old < 24:
