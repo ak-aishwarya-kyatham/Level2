@@ -1,5 +1,7 @@
 from typing import Optional
+
 from fastapi import APIRouter
+
 from app.mcp_client import mcp_client
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -73,7 +75,7 @@ async def refresh_live_news():
     res = await mcp_client.call_tool("fetch_latest_rss_feeds")
     return {
         "status": "success",
-        "message": f"Successfully refreshed live news feeds via MCP server!",
+        "message": "Successfully refreshed live news feeds via MCP server!",
         "total_articles": res.get("total_articles", 0) if isinstance(res, dict) else 0
     }
 

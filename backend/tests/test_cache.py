@@ -12,28 +12,27 @@ Tests:
 """
 
 import hashlib
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 pytestmark = pytest.mark.unit
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.utils.redis_cache import (
-    generate_cache_key,
-    normalize_query,
+    CACHE_KEY_PREFIX,
     cache_get,
     cache_set,
-    cache_delete,
+    generate_cache_key,
     get_cache_hit_rate,
+    normalize_query,
     reset_cache_counters,
     reset_redis_client,
-    CACHE_KEY_PREFIX,
-    CACHE_TTL_SECONDS,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

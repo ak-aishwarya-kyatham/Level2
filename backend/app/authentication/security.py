@@ -1,13 +1,15 @@
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
-from passlib.context import CryptContext
+
 import jwt
-import os
+from passlib.context import CryptContext
 
 PWD_CONTEXT = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Configuration could be moved to settings.py
 import secrets
+
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     # Use dynamically generated key on startup to avoid hardcoded defaults

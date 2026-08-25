@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from app.agents.duplicate import DuplicateDetectionAgent, generate_fallback_embedding
 from app.agents.response import synthesize_executive_summary
 
@@ -7,14 +9,14 @@ pytestmark = pytest.mark.integration
 
 def test_duplicate_detection_agent_logic():
     agent = DuplicateDetectionAgent()
-    
+
     art1 = {
         "title": "Samsung bans smart TV apps that expose internet connections",
         "content": "Samsung announced that it will ban any Smart TV application that shares or exposes users' internet connections without explicit authorization.",
         "source": "TechCrunch",
         "published_date": "2026-08-04T10:00:00Z"
     }
-    
+
     art2 = {
         "title": "Samsung Says It's Banning Smart TV Apps That Expose Users' Internet Connections",
         "content": "In a move to secure client data, Samsung is banning TV apps exposing connections.",
@@ -28,12 +30,12 @@ def test_duplicate_detection_agent_logic():
         "source": "Reuters",
         "published_date": "2026-08-04T10:30:00Z"
     }
-    
+
     # Check that duplicate articles are detected (similar titles/entities/content)
     is_dup1, sim1 = agent.are_duplicates(art1, art2)
     assert is_dup1 is True
     assert sim1 > 0.5
-    
+
     # Check that non-duplicate articles are not incorrectly marked duplicate
     is_dup2, sim2 = agent.are_duplicates(art1, art3)
     assert is_dup2 is False
@@ -112,21 +114,21 @@ def test_duplicate_detection_offline_behavior():
 
 def test_choose_better_article():
     agent = DuplicateDetectionAgent()
-    
+
     art_low = {
         "title": "Samsung bans smart TV apps",
         "content": "Short text.",
         "source": "GenericBlog",
         "published_date": "2026-08-04T09:00:00Z"
     }
-    
+
     art_high = {
         "title": "Samsung Says It's Banning Smart TV Apps That Expose Users' Internet Connections",
         "content": "Very long and rich complete article content explaining that Samsung announced that it will ban any Smart TV application that shares or exposes users' internet connections.",
         "source": "Reuters",
         "published_date": "2026-08-04T10:00:00Z"
     }
-    
+
     better = agent.choose_better_article(art_low, art_high)
     assert better["source"] == "Reuters"
 
@@ -145,14 +147,14 @@ def test_synthesis_rules():
             "published_date": "2026-08-04T10:10:00Z"
         }
     ]
-    
+
     summary = synthesize_executive_summary("Samsung and cybersecurity updates", docs)
-    
+
     # Check structure presence
     assert "Executive Intelligence Briefing" in summary
     assert "Live Synthesis Overview" in summary
     assert "Primary Source Links" in summary
-    
+
     key_summary = summary.split("**Key Summary:**")[1].split("---")[0].strip()
     assert "Samsung Says It's Banning" not in key_summary
     assert "developments surrounding" not in key_summary.lower()
@@ -161,7 +163,7 @@ def test_synthesis_rules():
 
 def test_query_understanding_and_category_routing():
     from app.agents.query_understanding import query_understanding_agent
-    
+
     # 1. NCP test
     state1 = {
         "query": "latest news about NCP",
@@ -176,7 +178,7 @@ def test_query_understanding_and_category_routing():
     assert "Nationalist Congress Party" in res1["extracted_topic"]
     assert "Nationalist Congress Party" in res1["extracted_entities"]
     assert res1["target_category"] == "Politics"
-    
+
     # 2. Kerala rains test
     state2 = {
         "query": "Kerala rains",
@@ -190,7 +192,7 @@ def test_query_understanding_and_category_routing():
     res2 = query_understanding_agent(state2)
     assert res2["extracted_topic"] == "Kerala rains"
     assert "Kerala" in res2["extracted_entities"]
-    
+
     # 3. URL test
     state3 = {
         "query": "summarize https://techcrunch.com/2026/08/apple-ai-news",
@@ -206,20 +208,20 @@ def test_query_understanding_and_category_routing():
 
 def test_faithfulness_validation_and_grounding():
     from app.agents.response import generate_grounded_summary, validate_faithfulness
-    
+
     docs = [
         {
             "title": "Kerala rains trigger massive floods and landslides",
             "content": "Heavy monsoon rains in Kerala have caused widespread flooding and mudslides, leading to school closures and transport disruptions across multiple districts. Authorities are setting up relief camps.",
         }
     ]
-    
+
     # 1. Test grounded summary generation produces content related to the query
     summary = generate_grounded_summary("Kerala rains", docs)
     assert len(summary) > 20, "Summary should not be empty"
     summary_lower = summary.lower()
     assert "kerala" in summary_lower or "flood" in summary_lower or "rain" in summary_lower or "weather" in summary_lower
-    
+
     # 2. Test faithfulness validation removes hallucinated buzzwords
     hallucinated_summary = "Heavy monsoon rains in Kerala caused widespread flooding. Local governments are deploying neural processors to optimize cloud-native water drainage systems."
     validated = validate_faithfulness(hallucinated_summary, docs)
@@ -228,8 +230,8 @@ def test_faithfulness_validation_and_grounding():
     assert "cloud-native" not in validated.lower()
 
 def test_live_feed_intent_and_synthesis():
-    from app.agents.triage import triage_agent
     from app.agents.response import synthesize_live_feed_briefing
+    from app.agents.triage import triage_agent
 
     # Test triage routing
     state = {"query": "what is the live feed latest one"}
@@ -256,8 +258,8 @@ def test_live_feed_intent_and_synthesis():
     assert "Government to raise CSAM lapses with Meta" in briefing
 
 def test_top_1_limit_handling():
-    from app.agents.triage import triage_agent
     from app.agents.response import synthesize_live_feed_briefing
+    from app.agents.triage import triage_agent
 
     state = {"query": "top 1"}
     res = triage_agent(state)

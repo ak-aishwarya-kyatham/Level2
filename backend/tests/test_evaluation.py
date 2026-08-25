@@ -1,18 +1,20 @@
-import time
 import inspect
+import time
+
 import pytest
 
 pytestmark = pytest.mark.integration
 from app.utils.evaluator import (
-    evaluate_execution,
-    evaluate_routing_accuracy,
+    CATEGORIZATION_EVAL_DATASET,
+    DEDUPLICATION_EVAL_DATASET,
+    GROUND_TRUTH_DATASET,
     calculate_dataset_routing_accuracy,
     evaluate_categorization_f1,
     evaluate_deduplication_recall,
-    GROUND_TRUTH_DATASET,
-    CATEGORIZATION_EVAL_DATASET,
-    DEDUPLICATION_EVAL_DATASET,
+    evaluate_execution,
+    evaluate_routing_accuracy,
 )
+
 
 def test_precision_at_5_real():
     """1. Precision@5: Measures retrieval quality in top 5 RAG search results using actual overlap."""
@@ -49,7 +51,7 @@ def test_mrr_at_10_real():
         {"title": "Other news", "content": "random"},
         {"title": "AI chips are here", "content": "Nvidia GPU"}
     ]
-    
+
     metrics_1 = evaluate_execution(
         query=query,
         response="answer",
@@ -68,7 +70,7 @@ def test_mrr_at_10_real():
         start_time=time.time(),
         cache_hit=False
     )
-    
+
     assert metrics_1["mrr_at_10"] == 1.0
     assert metrics_2["mrr_at_10"] == 0.5
 
@@ -185,8 +187,9 @@ async def test_routing_accuracy_benchmark_executes_policy_agent():
     - Computes Routing Accuracy, Coverage, Correct/Incorrect, and Confusion Matrix.
     """
     import json
-    from app.utils.evaluator import run_routing_benchmark, GROUND_TRUTH_DATASET
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
+
+    from app.utils.evaluator import GROUND_TRUTH_DATASET, run_routing_benchmark
 
     assert len(GROUND_TRUTH_DATASET) >= 10, f"Expected at least 10 queries, got {len(GROUND_TRUTH_DATASET)}"
 
@@ -257,6 +260,7 @@ def test_no_keyword_routing_in_evaluator():
     (not 0.5 as the old keyword logic would return).
     """
     import inspect
+
     from app.utils import evaluator as ev_module
     source = inspect.getsource(ev_module)
 

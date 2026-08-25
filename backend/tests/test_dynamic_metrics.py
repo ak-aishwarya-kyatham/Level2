@@ -1,8 +1,9 @@
-import pytest
 import os
-import json
-import time
+
+import pytest
+
 from app.repositories.news_repository import NewsRepository
+
 
 @pytest.fixture
 def clean_repo(tmp_path):
@@ -35,7 +36,7 @@ def test_metrics_return_null_when_no_evaluation_runs(clean_repo):
     """
     analytics = clean_repo.get_analytics_metrics()
     eval_metrics = analytics.get("evaluation_metrics", [])
-    
+
     assert len(eval_metrics) > 0
     for metric in eval_metrics:
         assert metric["score"] is None, f"Expected None for score in {metric['name']}, got {metric['score']}"
@@ -75,7 +76,7 @@ def test_metrics_calculated_from_actual_evaluation_data(clean_repo):
         }
     }
     clean_repo.record_evaluation_run(sample_run)
-    
+
     # 2. Record actual agent execution log
     clean_repo.record_agent_execution("RAG Search & Retrieval Agent", latency_ms=150.0, success=True)
     clean_repo.record_agent_execution("RAG Search & Retrieval Agent", latency_ms=250.0, success=True)

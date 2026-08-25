@@ -9,16 +9,16 @@ Tests:
 5. Fallback verifier fails to ground claims → UNVERIFIED, revise=True
 6. Reflection failure MUST NEVER automatically become revise=False / pass=True
 """
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 pytestmark = pytest.mark.integration
 from app.agents.reflection_agent import (
-    ReflectionAgent,
-    ReflectionReport,
-    REFLECTION_STATUS_VERIFIED,
-    REFLECTION_STATUS_UNVERIFIED,
     REFLECTION_STATUS_REVISED,
+    REFLECTION_STATUS_UNVERIFIED,
+    REFLECTION_STATUS_VERIFIED,
+    ReflectionAgent,
 )
 
 # ---------------------------------------------------------------------------

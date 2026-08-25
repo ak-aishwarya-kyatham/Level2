@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+
 from app.mcp_client import mcp_client
 
 router = APIRouter(prefix="/api/compare", tags=["compare"])

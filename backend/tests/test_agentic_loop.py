@@ -1,25 +1,26 @@
-import asyncio
-import os
 import json
-import requests
+import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+import requests
 
 pytestmark = pytest.mark.integration
-from app.agents.policy_agent import PolicyAgent, PolicyAction
+from app.agents.policy_agent import PolicyAction, PolicyAgent
 from app.agents.reflection_agent import ReflectionAgent, ReflectionReport
-from app.workflows.main_workflow import app_graph, policy_node, tool_node
 from app.workflows.langgraph_state import AgentState
+from app.workflows.main_workflow import app_graph
+
 
 async def test_policy_agent_parsing():
     """Verify that Policy Agent successfully parses correct JSON structure."""
     agent = PolicyAgent()
-    
+
     # Test valid JSON response parsing
     raw_text = '{"action": "tool", "tool": "search_live_news", "arguments": {"query": "test"}, "thought": "I need to search."}'
     cleaned = agent._sanitize_json_string(raw_text)
     assert "search_live_news" in cleaned
-    
+
     # Test fallback action construction on errors
     action = await agent.decide_action(
         query="what is happening?",
@@ -33,7 +34,7 @@ async def test_policy_agent_parsing():
 async def test_reflection_agent_parsing():
     """Verify that Reflection Agent generates valid report structure."""
     agent = ReflectionAgent()
-    
+
     # Test critique mapping on blank history
     report = await agent.reflect(
         query="AI trends",
@@ -60,7 +61,7 @@ async def test_agentic_loop_termination():
         agent_trace=[],
         evaluation_metrics={}
     )
-    
+
     # Invoke workflow
     final_state = await app_graph.ainvoke(state)
     print(f"DEBUG: iteration_count = {final_state.get('iteration_count')}")
@@ -333,11 +334,11 @@ class FakeOllamaLLM:
         else:
             # 2. Policy Agent Call
             self.policy_decisions_count += 1
-            
+
             # Verify tool schemas present in prompt
             if "Available Tools:" in prompt and "search_live_news" in prompt:
                 self.schemas_received = True
-                
+
             has_no_obs = "No tools have been called yet" in prompt
             has_obs_1 = ("Step 1:" in prompt or "India Tech Boom" in prompt) and not has_no_obs
             has_obs_2 = "total_articles" in prompt or "Step 2:" in prompt
@@ -481,7 +482,7 @@ async def test_llm_mediated_policy_agent_and_reflection_loop():
     assert fake_ollama.policy_decisions_count == 4, f"Expected 4 Policy decisions, got {fake_ollama.policy_decisions_count}"
     assert fake_ollama.reflection_decisions_count == 2, f"Expected 2 Reflection decisions, got {fake_ollama.reflection_decisions_count}"
     assert called_tools == ["search_live_news", "get_dashboard_analytics"], f"Unexpected tool call sequence: {called_tools}"
-    
+
     # Final response verified
     assert "REVISED" in final_state.get("final_response", ""), "Final response did not contain revised output"
     assert len(final_state.get("observations", [])) >= 3, "Observations must contain tool results and reflection critique"
@@ -595,7 +596,7 @@ async def test_policy_action_validation_feedback_loop():
     # Verify structured observation recorded for validation failure
     obs = final_state.get("observations", [])
     assert len(obs) >= 2, f"Expected at least 2 observations (validation error + tool result), got {len(obs)}"
-    
+
     val_err_obs = [o for o in obs if "VALIDATION ERROR" in str(o.get("result"))]
     assert len(val_err_obs) >= 1, "Validation failure observation was not recorded in state"
     assert "fake_invalid_tool" in str(val_err_obs[0].get("tool")), "Validation observation did not log invalid tool name"

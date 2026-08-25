@@ -1,15 +1,14 @@
-import os
+import hashlib
 import json
 import logging
+import os
 import re
-import hashlib
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-from app.schemas.news import NewsArticleBase, NewsArticle
-from app.agents.ingestion import NewsIngestionAgent as IngestionAgent
-from app.agents.cleaning import CleaningAgent
 from app.agents.categorization import CategorizationAgent
+from app.agents.cleaning import CleaningAgent
+from app.agents.ingestion import NewsIngestionAgent as IngestionAgent
 
 logger = logging.getLogger(__name__)
 
@@ -374,7 +373,7 @@ class NewsRepository:
                 for q in quoted:
                     q_clean = q.strip().lower()
                     q_words = set(re.findall(r'\b[a-zA-Z0-9]{3,}\b', q_clean))
-                    
+
                     best_match = None
                     best_score = 0.0
 
@@ -384,7 +383,7 @@ class NewsRepository:
                         if q_clean == t_lower or q_clean in t_lower or (len(t_lower) > 25 and t_lower in q_clean):
                             logger.info(f"[Search] Found exact title substring match for: '{q}'. Returning 1 targeted article.")
                             return [a]
-                        
+
                         # High word-token overlap scoring for minor variations/punctuation/quotes
                         t_words = set(re.findall(r'\b[a-zA-Z0-9]{3,}\b', t_lower))
                         if q_words and t_words:
@@ -392,7 +391,7 @@ class NewsRepository:
                             if overlap > best_score:
                                 best_score = overlap
                                 best_match = a
-                    
+
                     if best_match and best_score >= 0.35:
                         logger.info(f"[Search] Found high token overlap match ({best_score:.2f}) for: '{q}'. Returning 1 targeted article.")
                         return [best_match]
@@ -410,7 +409,7 @@ class NewsRepository:
                     title = (a.get("title") or "").lower()
                     content = (a.get("content") or "").lower()
                     cat = (a.get("category") or "").lower()
-                    
+
                     # Domain Purity Guard: Exclude non-business titles (entertainment/movies/sports) when searching Economics/Finance
                     query_lower = query.lower()
                     if any(k in query_lower for k in ["economic", "economy", "market", "finance", "stock", "business", "forex", "yen", "fed"]):
@@ -432,7 +431,7 @@ class NewsRepository:
             clean_term = re.sub(r"(?i)\b(state|region|today|latest|now|please)\b", "", clean_term).strip()
             clean_term = re.sub(r"\s+", " ", clean_term).strip()
             term_to_fetch = clean_term or query.strip()
-            
+
             logger.info(f"Fetching live Google News RSS articles for '{term_to_fetch}' (raw query: '{query}')...")
             try:
                 live_items = await self.ingestion_agent.fetch_dynamic_topic_news(term_to_fetch, limit=15)
@@ -841,7 +840,7 @@ class NewsRepository:
                         pct = max(spec["target_val"], raw_pct)
                         value_text = f"{pct}%"
                         status = "PASSED"
-                    
+
                     latest_run = self.evaluation_runs[-1]
                     evaluation_metrics.append({
                         "name": spec["name"],

@@ -1,5 +1,7 @@
 import pytest
+
 from app.main import read_root
+
 
 @pytest.mark.unit
 @pytest.mark.asyncio

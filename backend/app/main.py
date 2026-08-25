@@ -1,13 +1,13 @@
 import asyncio
 import logging
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.routers import chat, dashboard, analytics, compare, sources
-from app.repositories.news_repository import news_repository
-from app.mcp_client import mcp_client
-
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.mcp_client import mcp_client
+from app.repositories.news_repository import news_repository
+from app.routers import analytics, chat, compare, dashboard, sources
 from app.utils.task_lifecycle import task_manager
 
 logger = logging.getLogger("uvicorn")
@@ -35,11 +35,12 @@ async def lifespan(app: FastAPI):
     tools = await mcp_client.list_available_tools()
     tool_names = [t if isinstance(t, str) else t.get("name", "") for t in tools if t]
     logger.info(f"Registered MCP Tools ({len(tools)}): {tool_names}")
-    
+
     # Pre-flight check for Ollama local LLM server
     try:
-        from app.utils.async_http import async_get_json
         import os
+
+        from app.utils.async_http import async_get_json
         ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
         ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
         status, data, _ = await async_get_json(f"{ollama_url}/api/tags", timeout=1.5)
@@ -58,7 +59,7 @@ async def lifespan(app: FastAPI):
     # Track background tasks via task_manager
     task_manager.create_task(periodic_news_fetcher(), name="periodic_news_fetcher")
     yield
-    
+
     logger.info("Application shutdown initiated. Cancelling background tasks...")
     await task_manager.cancel_all()
     await mcp_client.stop()

@@ -1,10 +1,10 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-import os
 from fastapi.testclient import TestClient
+
 from app.main import app
 from app.repositories.news_repository import news_repository
-
-from unittest.mock import patch, AsyncMock
 
 client = TestClient(app)
 
@@ -21,7 +21,7 @@ def test_analytics_metrics_endpoint_empty_state():
     assert response.status_code == 200
     res = response.json()
     assert "evaluation_metrics" in res
-    
+
     eval_metrics = res["evaluation_metrics"]
     expected_keys = {
         "precision_at_5",
@@ -35,10 +35,10 @@ def test_analytics_metrics_endpoint_empty_state():
         "deduplication_recall",
         "categorization_f1"
     }
-    
+
     returned_keys = {m["metric_key"] for m in eval_metrics}
     assert expected_keys.issubset(returned_keys), f"Missing keys: {expected_keys - returned_keys}"
-    
+
     for metric in eval_metrics:
         assert metric["score"] is None
         assert metric["percentage"] is None
@@ -67,14 +67,14 @@ def test_analytics_evaluate_and_metrics_flow():
         eval_data = eval_resp.json()
         assert eval_data["status"] == "success"
         assert "metrics" in eval_data
-        
+
         metrics_resp = client.get("/api/analytics/metrics")
         assert metrics_resp.status_code == 200
         res = metrics_resp.json()
-        
+
         eval_metrics = res["evaluation_metrics"]
         assert len(eval_metrics) >= 10
-        
+
         for metric in eval_metrics:
             assert metric["score"] is not None
             assert metric["percentage"] is not None

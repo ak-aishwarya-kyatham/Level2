@@ -1,10 +1,10 @@
-import os
 import json
 import logging
+import os
 import time
-import requests
-from typing import List, Dict, Any, Literal, Tuple, Optional
-from pydantic import BaseModel, Field, model_validator, ValidationError
+from typing import Any, Dict, List, Literal, Optional, Tuple
+
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -288,7 +288,7 @@ class PolicyAgent:
                 if tool_name in ["reflection_feedback", "reflection_critique"]:
                     history_str += f"Step {idx} [REFLECTION AGENT CRITIQUE - REVISION REQUIRED]:\n"
                     history_str += f"  Reflection Feedback: {step.get('result')}\n"
-                    history_str += f"  REVISION DIRECTIVE: The Reflection Agent flagged unsupported/unverified claims in the previous synthesis. You MUST choose a DIFFERENT tool or a MORE SPECIFIC search query/category (e.g. search_live_news with specific topic keywords) to retrieve grounded evidence to address these claims. Do NOT repeat identical tool calls with identical arguments!\n\n"
+                    history_str += "  REVISION DIRECTIVE: The Reflection Agent flagged unsupported/unverified claims in the previous synthesis. You MUST choose a DIFFERENT tool or a MORE SPECIFIC search query/category (e.g. search_live_news with specific topic keywords) to retrieve grounded evidence to address these claims. Do NOT repeat identical tool calls with identical arguments!\n\n"
                     continue
                 history_str += f"Step {idx}:\n"
                 history_str += f"  Thought: {step.get('thought')}\n"

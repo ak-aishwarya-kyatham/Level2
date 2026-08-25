@@ -1,15 +1,13 @@
-import asyncio
-import json
-import time
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 pytestmark = pytest.mark.integration
 
-from app.workflows.main_workflow import app_graph
-from app.workflows.langgraph_state import AgentState
 from app.agents.policy_agent import PolicyAction
 from app.agents.reflection_agent import ReflectionReport
+from app.workflows.langgraph_state import AgentState
+from app.workflows.main_workflow import app_graph
 
 
 class DeterministicWorkflowSimulator:
@@ -21,7 +19,7 @@ class DeterministicWorkflowSimulator:
         self.policy_calls = 0
         self.reflection_calls = 0
         self.trace = []
-        
+
         self.schemas_received = []
         self.history_received = []
         self.second_decision_depended_on_obs1 = False
@@ -49,7 +47,7 @@ class DeterministicWorkflowSimulator:
             # Turn 2: Policy receives Observation 1 in history, chooses compare_news_sources tool
             if len(history) >= 1 and history[0].get("tool") == "search_live_news":
                 self.second_decision_depended_on_obs1 = True
-            
+
             self.trace.append("->\nPOLICY: tool=compare_news_sources, arguments={'source1': 'The Hindu', 'source2': 'Indian Express'}")
             return PolicyAction(
                 action="tool",
@@ -72,7 +70,7 @@ class DeterministicWorkflowSimulator:
             # Turn 4: Policy receives Reflection critique (revise=True) in history, provides revised grounded answer
             critique_obs = [h for h in history if h.get("tool") == "reflection_critique"]
             assert len(critique_obs) > 0, "Policy Agent did not receive reflection critique in history"
-            
+
             revised_answer = (
                 "## 📰 Executive Intelligence Briefing: Telangana Housing Allocation\n\n"
                 "**Overview:** Telangana Housing Minister urges Centre to allocate 11.56 lakh houses under PMAY-G 2.0.\n\n"

@@ -1,10 +1,11 @@
-import os
-import json
 import logging
+import os
 import re
-import requests
-from typing import List, Dict, Any, Optional, Tuple
 from collections import Counter
+from typing import List
+
+import requests
+
 from app.workflows.langgraph_state import AgentState
 
 logger = logging.getLogger(__name__)
@@ -164,26 +165,26 @@ def clean_news_sentence(sent: str) -> str:
     """
     if not sent:
         return ""
-    
+
     s = sent.strip()
-    
+
     # Remove common RSS / publisher / rumor prefixes
     s = re.sub(r'^(?:LIVE|UPDATE|UPDATES|BREAKING|WATCH|JUST IN|EXPLAINER|OPINION):\s*', '', s, flags=re.IGNORECASE)
     s = re.sub(r'^(?:[A-Z0-9\s\-]{2,15}\s*LIVE|\w+\s+LIVE\s+Updates):\s*', '', s, flags=re.IGNORECASE)
     s = re.sub(r"(?i)^(samsung says it's banning|reports indicate|sources say)\s+", "", s)
-    
+
     # Remove trailing source attributions like " - CNN", " - Entrackr", " | TechCrunch"
     # IMPORTANT: require a SPACE before the dash/pipe so mid-title hyphens (e.g. Myanmar-Thailand) are not stripped
     s = re.sub(r'\s+[\-\|]\s+(?:[a-zA-Z0-9\.\-]+\.(?:com|org|net|in|co|io|dev|ai|uk|gov)|[A-Z][A-Za-z0-9\s]{2,25}(?:News|Times|Express|Post|Today|Daily|Journal|Wire|Media|Report|Bureau|Desk))\s*$', '', s)
     s = re.sub(r'\s+[\-\|]\s+(?:CNN|BBC|Reuters|AP News|TechCrunch|NDTV News|The Hindu|Indian Express|Google News|CoinDesk|Yahoo Finance|Investor\'s Business Daily|Bloomberg|WSJ|Engadget|NDTV|TOI|HT|ET)\b.*$', '', s, flags=re.IGNORECASE)
-    
+
     # Clean up double punctuation or awkward whitespace
     s = re.sub(r'\s+', ' ', s).strip()
-    
+
     # Ensure proper sentence termination
     if s and not s.endswith(('.', '!', '?')):
         s += '.'
-        
+
     return s
 
 
@@ -449,10 +450,10 @@ def validate_faithfulness(summary: str, docs: list) -> str:
     for line in lines:
         if not line.strip():
             continue
-        
+
         sentences = re.split(r'(?<=[.!?])\s+', line)
         sentences = [s.strip() for s in sentences if s.strip()]
-        
+
         valid_sents = []
         for sent in sentences:
             sent_lower = sent.lower()
@@ -555,7 +556,7 @@ def synthesize_live_feed_briefing(docs: list, limit: int = 10) -> str:
         meta_parts = [f"**{source}**", f"`{category}`"]
         if formatted_time:
             meta_parts.append(f"🕒 {formatted_time}")
-        
+
         meta = " · ".join(meta_parts)
 
         prefix = f"### {idx}. " if limit > 1 else "### "
@@ -782,7 +783,7 @@ def synthesize_comparison_briefing(query: str, docs: list, source1: str = None, 
             else:
                 other_items.append(f"• **[{src}] {title}**")
         if other_items:
-            other_block = f"\n\n---\n\n### 🔍 Additional Grounding Context (from Revision Search):\n" + "\n".join(other_items)
+            other_block = "\n\n---\n\n### 🔍 Additional Grounding Context (from Revision Search):\n" + "\n".join(other_items)
 
     # ── Source links ──────────────────────────────────────────────────────────
     link_docs = [s1_docs[i] for i, _, _ in shared_stories] + exclusive_s1[:2] + exclusive_s2[:2] + other_docs[:3]
@@ -798,10 +799,10 @@ def synthesize_comparison_briefing(query: str, docs: list, source1: str = None, 
 
     # ── Assemble final output ─────────────────────────────────────────────────
     shared_section = (
-        f"### 🔄 Stories Covered by Both Outlets (Editorial Angle Comparison)\n\n"
+        "### 🔄 Stories Covered by Both Outlets (Editorial Angle Comparison)\n\n"
         + "\n".join(shared_blocks)
         if shared_blocks else
-        f"### 🔄 Stories Covered by Both Outlets\n\n*No overlapping stories found in current live feed.*"
+        "### 🔄 Stories Covered by Both Outlets\n\n*No overlapping stories found in current live feed.*"
     )
 
     total_retrieved = len(s1_docs) + len(s2_docs) + len(other_docs)

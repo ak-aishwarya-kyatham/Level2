@@ -1,17 +1,13 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-import re
-from unittest.mock import patch, AsyncMock
 
 pytestmark = pytest.mark.integration
 
-from app.agents.response import (
-    synthesize_executive_summary,
-    validate_faithfulness,
-    response_generation_agent
-)
-from app.workflows.main_workflow import _synthesize_from_observations, reflection_node, app_graph
+from app.agents.reflection_agent import REFLECTION_STATUS_UNVERIFIED, ReflectionReport
+from app.agents.response import validate_faithfulness
 from app.workflows.langgraph_state import AgentState
-from app.agents.reflection_agent import ReflectionReport, REFLECTION_STATUS_UNVERIFIED, REFLECTION_STATUS_VERIFIED
+from app.workflows.main_workflow import _synthesize_from_observations, reflection_node
 
 
 def test_response_synthesis_grounded_in_observations():

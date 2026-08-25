@@ -1,9 +1,9 @@
-import os
-import re
 import json
 import logging
-import requests
-from typing import List, Dict, Any, Optional
+import os
+import re
+from typing import Any, Dict, List
+
 from pydantic import BaseModel, Field, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -249,7 +249,7 @@ class ReflectionAgent:
             )
 
         # Check if Ollama circuit breaker is active from a previous timeout
-        from app.agents.policy_agent import is_ollama_circuit_open, mark_ollama_offline
+        from app.agents.policy_agent import is_ollama_circuit_open
         if is_ollama_circuit_open():
             logger.info("[Reflection Agent] Circuit breaker active — skipping LLM wait and running fast deterministic verifier.")
             return self._deterministic_fallback_verify(answer, history, query)

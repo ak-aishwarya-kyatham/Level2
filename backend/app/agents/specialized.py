@@ -6,6 +6,7 @@ The active Level 2 agent architecture executes via LangGraph dynamic ReAcT loop:
 Retained for backwards compatibility.
 """
 import logging
+
 from app.workflows.langgraph_state import AgentState
 
 logger = logging.getLogger(__name__)

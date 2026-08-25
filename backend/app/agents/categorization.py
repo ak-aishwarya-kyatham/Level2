@@ -9,7 +9,7 @@ class CategorizationAgent:
     """
     def __init__(self):
         self.categories = [
-            "Politics", "Sports", "Business", "Technology", 
+            "Politics", "Sports", "Business", "Technology",
             "Entertainment", "Health", "Education", "International",
             "Environment", "World"
         ]

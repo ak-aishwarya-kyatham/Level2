@@ -1,16 +1,18 @@
-from langgraph.graph import StateGraph, END
-import logging
-import time
-import re
 import json
+import logging
+import re
+import time
 from datetime import datetime, timezone
+from typing import Any
 
-from app.workflows.langgraph_state import AgentState
+from langgraph.graph import END, StateGraph
+
 from app.agents.policy_agent import PolicyAgent
 from app.agents.reflection_agent import ReflectionAgent
 from app.mcp_client import mcp_client
 from app.utils.evaluator import evaluate_execution
 from app.utils.redis_cache import cache_get, cache_set, get_cache_hit_rate
+from app.workflows.langgraph_state import AgentState
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +70,8 @@ async def cache_node(state: AgentState) -> AgentState:
 
 
     # Run triage and query understanding
-    from app.agents.triage import triage_agent
     from app.agents.query_understanding import query_understanding_agent
+    from app.agents.triage import triage_agent
     try:
         state = triage_agent(state)
         state = query_understanding_agent(state)
@@ -107,7 +109,7 @@ async def policy_node(state: AgentState) -> AgentState:
 
     query = state["query"]
     tools = await mcp_client.list_available_tools()
-    
+
     # Run Policy Agent
     decision = await policy_agent.decide_action(
         query=query,
@@ -115,7 +117,7 @@ async def policy_node(state: AgentState) -> AgentState:
         history=state["observations"],
         iteration_count=state["iteration_count"] + 1
     )
-    
+
     # 1. Validation Check: If LLM output failed Pydantic or MCP schema validation,
     # record a structured observation detailing the validation failure and return to Policy Agent for re-decision.
     if not decision.is_valid:
@@ -151,7 +153,7 @@ async def policy_node(state: AgentState) -> AgentState:
             if isinstance(a, dict):
                 return json.dumps(a, sort_keys=True)
             return str(a)
-        
+
         current_canon = (decision.tool, _canon_args(decision.arguments))
         previous_calls = [(obs.get("tool"), _canon_args(obs.get("arguments"))) for obs in state["observations"] if obs.get("tool")]
         if current_canon in previous_calls and len(state["observations"]) >= 1:
@@ -163,17 +165,17 @@ async def policy_node(state: AgentState) -> AgentState:
     if decision.action == "tool":
         obs_count = len(state["observations"])
         logger.info(f"[Workflow] Policy Agent selected tool '{decision.tool}' (observation #{obs_count + 1}).")
-    
+
     # Store decisions in temporary state variables (or agent_trace)
     state["next_action"] = decision.action
     state["action_thought"] = decision.thought
-    
+
     if decision.action == "tool":
         state["action_tool"] = decision.tool
         state["action_arguments"] = decision.arguments
     else:
         state["action_answer"] = decision.answer
-        
+
     state["agent_trace"].append(f"Thought: {decision.thought}")
     return state
 
@@ -217,18 +219,18 @@ async def tool_node(state: AgentState) -> AgentState:
     arguments = state.get("action_arguments", {})
     thought = state.get("action_thought", "")
     iteration = state.get("iteration_count", 0) + 1
-    
+
     # 1. Validate tool arguments
     if not isinstance(arguments, dict):
         logger.warning(f"[Workflow] Arguments for tool '{tool_name}' is not a dict. Forcing to empty dict.")
         arguments = {}
-        
+
     # Escape query/params string args
     for k, v in list(arguments.items()):
         if isinstance(v, str):
             # Basic validation/cleanup
             arguments[k] = v.strip()
-            
+
     t_start = time.time()
     try:
         # Call tool via standard MCP ClientSession
@@ -236,12 +238,12 @@ async def tool_node(state: AgentState) -> AgentState:
     except Exception as e:
         logger.error(f"[Workflow] Tool execution failed: {e}")
         result = {"error": f"Failed to execute tool: {str(e)}"}
-        
+
     t_end = time.time()
-    
+
     # 2. Sanitize result before recording
     sanitized_result = sanitize_observation(result)
-    
+
     # Record agent execution metrics in news_repository
     try:
         from app.repositories.news_repository import news_repository
@@ -263,20 +265,23 @@ async def tool_node(state: AgentState) -> AgentState:
     }
     state["observations"].append(observation)
     state["iteration_count"] = iteration
-    
+
     # Store retrieved documents if search tool is used
     if tool_name == "search_live_news" and isinstance(sanitized_result, list):
         state["retrieved_documents"].extend(sanitized_result)
     elif tool_name == "get_articles_by_category" and isinstance(sanitized_result, list):
         state["retrieved_documents"].extend(sanitized_result)
-        
+
     state["agent_trace"].append(f"Action: Called tool '{tool_name}' -> Observation length: {len(str(sanitized_result))}")
     return state
 
 
 def _synthesize_from_observations(query: str, observations: list, intent: str = "") -> str:
     """Build a readable response from raw tool observations using grounded executive summarization."""
-    from app.agents.response import synthesize_executive_summary, synthesize_comparison_briefing
+    from app.agents.response import (
+        synthesize_comparison_briefing,
+        synthesize_executive_summary,
+    )
     articles = []
     source1_val = None
     source2_val = None
@@ -423,7 +428,7 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
                 }]
             else:
                 return "No relevant observations were retrieved for your query. Please verify search parameters or refresh the news feeds."
-        
+
         # Deduplicate by title
         seen = set()
         unique = []
@@ -431,7 +436,7 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
             if a["title"] not in seen:
                 seen.add(a["title"])
                 unique.append(a)
-        
+
         if intent == "compare" or source1_val or source2_val:
             return synthesize_comparison_briefing(query, unique, source1=source1_val, source2=source2_val)
 
@@ -443,7 +448,9 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
 
 # Reflection node
 async def reflection_node(state: AgentState) -> AgentState:
-    from app.agents.reflection_agent import ReflectionReport, REFLECTION_STATUS_VERIFIED, REFLECTION_STATUS_UNVERIFIED, REFLECTION_STATUS_REVISED
+    from app.agents.reflection_agent import (
+        REFLECTION_STATUS_UNVERIFIED,
+    )
     query = state["query"]
     answer = state.get("action_answer", "")
     history = state.get("observations", [])
@@ -452,7 +459,7 @@ async def reflection_node(state: AgentState) -> AgentState:
     # Pre-synthesis: if answer is generic or a sentinel placeholder, synthesize grounded briefing first
     is_raw_list    = bool(answer and answer.startswith("Summary:") and len(answer.split("\n")) <= 2)
     is_generic     = bool(
-        not answer 
+        not answer
         or answer in ["No response generated.", "No detailed information was found.", "Synthesized response from collected observations.", "Synthesized response from retrieved observations."]
         or answer.startswith("Synthesized response")
     )
@@ -564,7 +571,7 @@ async def reflection_node(state: AgentState) -> AgentState:
         # Override cache_hit_rate with actual dynamic value from Redis counters
         metrics["cache_hit_rate"] = get_cache_hit_rate()
         state["evaluation_metrics"] = metrics
-        
+
         # Persist dynamic evaluation run to news_repository store
         try:
             from app.repositories.news_repository import news_repository

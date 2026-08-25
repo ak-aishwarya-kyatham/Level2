@@ -1,11 +1,11 @@
-import time
-import re
+import asyncio
 import json
 import os
-import asyncio
-from typing import List, Dict, Any, Optional
-from app.utils.redis_cache import get_cache_hit_rate
+import re
+import time
+from typing import Any, Dict, List, Optional
 
+from app.utils.redis_cache import get_cache_hit_rate
 
 # ---------------------------------------------------------------------------
 # Ground Truth Routing Dataset
@@ -481,7 +481,7 @@ def evaluate_execution(
     query_tokens = set(tokenize(query))
     stop_words = {"the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "of", "with", "by", "what", "is", "are", "tell", "me", "more", "about", "show", "find", "search", "latest", "news", "today"}
     content_query_tokens = query_tokens - stop_words
-    
+
     precision_at_5 = 0.0
     mrr_at_10 = 0.0
 

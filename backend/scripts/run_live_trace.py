@@ -1,21 +1,23 @@
+import asyncio
 import os
 import sys
-import asyncio
+
 import requests
 
 # Ensure app module is importable
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.mcp_client import mcp_client
 from app.agents.policy_agent import PolicyAgent
 from app.agents.reflection_agent import ReflectionAgent
+from app.mcp_client import mcp_client
 from app.workflows.main_workflow import _synthesize_from_observations
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 
 
-from typing import Tuple, List
+from typing import List, Tuple
+
 
 def check_ollama_status() -> Tuple[bool, bool, List[str]]:
     """
@@ -55,7 +57,7 @@ async def run_live_trace():
     if not model_installed:
         print(f"\n[ERROR] Ollama server is online at {OLLAMA_URL}, but model '{OLLAMA_MODEL}' is NOT pulled/installed.")
         print(f"Available installed models in Ollama: {available_models or 'None'}")
-        print(f"To pull the required model, run:")
+        print("To pull the required model, run:")
         print(f"   ollama pull {OLLAMA_MODEL}")
         print("Or set OLLAMA_MODEL environment variable to use one of the installed models.")
         sys.exit(1)
@@ -92,7 +94,7 @@ async def run_live_trace():
     # 2. Multi-iteration Policy & Reflection Loop (Max 3 iterations total: 1 initial + 2 revisions)
     policy_agent = PolicyAgent()
     reflection_agent = ReflectionAgent()
-    
+
     history = []
     observations = []
     max_iterations = 3

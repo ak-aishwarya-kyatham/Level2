@@ -1,8 +1,9 @@
 import logging
+from typing import Any, Dict, Tuple
+from unittest.mock import Mock
+
 import httpx
 import requests
-from typing import Tuple, Dict, Any
-from unittest.mock import Mock
 
 logger = logging.getLogger(__name__)
 

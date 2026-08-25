@@ -1,9 +1,11 @@
 import os
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from app.repositories.news_repository import NewsRepository
+
 from app.database.mongodb import MongoDBManager
 from app.database.qdrant import QdrantManager
+from app.repositories.news_repository import NewsRepository
 from app.workflows.scheduler import NewsPipelineScheduler
 
 pytestmark = pytest.mark.unit
@@ -57,6 +59,5 @@ def test_news_repository_configurable_data_file(tmp_path):
     """4. Test that NewsRepository respects custom ARTICLES_DATA_FILE environment variable."""
     custom_file = str(tmp_path / "custom_articles.json")
     with patch.dict(os.environ, {"ARTICLES_DATA_FILE": custom_file}):
-        from app.repositories import news_repository
         repo = NewsRepository()
         assert repo.get_all_embeddings() == [] or isinstance(repo.get_all_embeddings(), list)

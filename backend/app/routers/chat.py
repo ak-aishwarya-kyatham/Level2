@@ -1,16 +1,19 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from app.workflows.main_workflow import app_graph
-from app.workflows.langgraph_state import AgentState
 import logging
 import time
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from app.workflows.langgraph_state import AgentState
+from app.workflows.main_workflow import app_graph
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-from pydantic import BaseModel, model_validator
+from pydantic import model_validator
+
 
 class ChatRequest(BaseModel):
     query: Optional[str] = None
@@ -54,15 +57,15 @@ async def chat_endpoint(request: ChatRequest):
         cache_hit=False
     )
 
-    
+
     try:
         # Run the LangGraph workflow
         final_state = await app_graph.ainvoke(initial_state)
-        
+
         t_end = time.time()
         logger.info(f"⏱️ TOTAL CHAT RESPONSE TIME: {t_end - t_start:.1f}s for query: \"{request.query}\"")
-        logger.info(f"Execution trace:\n" + "\n".join(final_state.get("agent_trace", [])))
-        
+        logger.info("Execution trace:\n" + "\n".join(final_state.get("agent_trace", [])))
+
         return ChatResponse(
             response=final_state.get("final_response") or "No response generated.",
             intent=final_state.get("intent", "search"),

@@ -1,6 +1,7 @@
 import logging
-import requests
 from typing import List
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class EmbeddingAgent:
             logger.warning("Embedding model not loaded. Returning deterministic fallback embedding vector.")
             from app.agents.duplicate import generate_fallback_embedding
             return generate_fallback_embedding(text)
-            
+
         try:
             import torch
             encoded_input = self.tokenizer([text], padding=True, truncation=True, return_tensors='pt', max_length=512)

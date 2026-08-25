@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
 from datetime import datetime, timezone
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 def _utc_now():
     return datetime.now(timezone.utc)

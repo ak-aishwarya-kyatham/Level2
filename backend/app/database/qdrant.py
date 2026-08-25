@@ -1,9 +1,10 @@
-import os
 import hashlib
 import logging
-from typing import List, Dict, Any, Optional
+import os
+from typing import Optional
+
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, PointStruct, VectorParams
 
 logger = logging.getLogger(__name__)
 

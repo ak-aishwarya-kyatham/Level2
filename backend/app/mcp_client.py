@@ -1,10 +1,11 @@
-import os
-import sys
+import asyncio
 import json
 import logging
-import asyncio
-from typing import Dict, Any, List, Optional
+import os
+import sys
 from contextlib import AsyncExitStack
+from typing import Any, Dict, List, Optional
+
 from mcp import StdioServerParameters, stdio_client
 from mcp.client.session import ClientSession
 
@@ -161,7 +162,7 @@ class NewsIntelMCPClient:
         """
         arguments = arguments or {}
         logger.info(f"[MCP Client -> MCP Server] Invoking tool '{tool_name}' with args {arguments}")
-        
+
         if not self.session:
             try:
                 await self.start()

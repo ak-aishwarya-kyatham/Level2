@@ -1,4 +1,5 @@
-from typing import TypedDict, List, Dict, Any
+from typing import Any, Dict, List, TypedDict
+
 
 class AgentState(TypedDict):
     """
@@ -18,21 +19,21 @@ class AgentState(TypedDict):
     target_category: str
     target_url: str
     requested_limit: int
-    
+
     # L2 Agentic Upgrades
     observations: List[Dict[str, Any]]
     iteration_count: int
     reflection_report: Dict[str, Any]
     agent_trace: List[str]
     evaluation_metrics: Dict[str, Any]
-    
+
     # Workflow transition states
     next_action: str
     action_answer: str
     action_thought: str
     action_tool: str
     action_arguments: Dict[str, Any]
-    
+
     # Real Telemetry & Evaluation States
     start_time: float
     cache_hit: bool

@@ -1,8 +1,9 @@
+from typing import List
+
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-import jwt
 from pydantic import ValidationError
-from typing import List
 
 from app.authentication import security
 

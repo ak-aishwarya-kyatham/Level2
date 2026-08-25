@@ -1,5 +1,6 @@
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
 try:
     from mcp.server.fastmcp import FastMCP
 except ImportError:

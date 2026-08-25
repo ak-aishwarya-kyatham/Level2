@@ -1,14 +1,16 @@
 import logging
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-# Import our agents
-from app.agents.ingestion import NewsIngestionAgent
-from app.agents.cleaning import CleaningAgent
 from app.agents.categorization import CategorizationAgent
 from app.agents.chunking import ChunkingAgent
-from app.agents.embedding import EmbeddingAgent
+from app.agents.cleaning import CleaningAgent
 from app.agents.duplicate import DuplicateDetectionAgent
+from app.agents.embedding import EmbeddingAgent
+
+# Import our agents
+from app.agents.ingestion import NewsIngestionAgent
 
 logger = logging.getLogger(__name__)
 
@@ -27,40 +29,40 @@ class NewsPipelineScheduler:
 
     async def ingestion_workflow(self):
         logger.info("Starting scheduled ingestion workflow...")
-        
+
         # 1. Ingestion
         articles = await self.ingestion_agent.run()
-        
+
         for article in articles:
             try:
                 # 2. Cleaning
                 cleaned_text = await self.cleaning_agent.run(article)
                 article.cleaned_content = cleaned_text
-                
+
                 # 3. Categorization
                 category = await self.categorization_agent.run(cleaned_text)
                 article.category = category
-                
+
                 # 4. Chunking
                 chunks = await self.chunking_agent.run(cleaned_text)
                 article.chunks = chunks
-                
+
                 # 5. Embedding
-                # We can embed the whole document or just chunks. 
+                # We can embed the whole document or just chunks.
                 # According to the flow: Article -> Chunks -> Embeddings
                 # Here we just embed the cleaned text for duplicate detection.
                 embedding = await self.embedding_agent.run(cleaned_text)
                 article.embedding = embedding
-                
+
                 # 6. Duplicate Detection using real stored embeddings from repository
-                from app.repositories.news_repository import news_repository
                 from app.database.mongodb import mongodb_manager
                 from app.database.qdrant import qdrant_manager
+                from app.repositories.news_repository import news_repository
 
                 existing_embeddings = news_repository.get_all_embeddings()
                 is_duplicate, _ = await self.duplicate_agent.run(embedding, existing_embeddings)
                 article.is_duplicate = is_duplicate
-                
+
                 if not is_duplicate:
                     logger.info(f"New unique article: {article.title}. Persisting to repositories...")
                     import hashlib
@@ -97,7 +99,7 @@ class NewsPipelineScheduler:
                         )
                 else:
                     logger.info(f"Article is duplicate: {article.title}. Skipping.")
-                    
+
             except Exception as e:
                 logger.error(f"Error processing article {article.title}: {e}")
 

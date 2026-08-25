@@ -1,10 +1,11 @@
 import hashlib
 import logging
-import numpy as np
 import re
-import requests
-from typing import List, Dict, Any, Tuple, Set, Optional, Callable
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -187,12 +188,12 @@ class DuplicateDetectionAgent:
         if emb_title1 is None:
             emb_title1 = self.get_ollama_embedding(title1)
             art1["title_emb"] = emb_title1
-            
+
         emb_title2 = art2.get("title_emb")
         if emb_title2 is None:
             emb_title2 = self.get_ollama_embedding(title2)
             art2["title_emb"] = emb_title2
-            
+
         title_sim = self.cosine_similarity(emb_title1, emb_title2)
 
         # Early exit if titles are completely different to save content embedding API calls
@@ -215,12 +216,12 @@ class DuplicateDetectionAgent:
         if emb_content1 is None:
             emb_content1 = self.get_ollama_embedding(content1[:500])
             art1["content_emb"] = emb_content1
-            
+
         emb_content2 = art2.get("content_emb")
         if emb_content2 is None:
             emb_content2 = self.get_ollama_embedding(content2[:500])
             art2["content_emb"] = emb_content2
-            
+
         content_sim = self.cosine_similarity(emb_content1, emb_content2)
 
         # Deduplication Decision Matrix

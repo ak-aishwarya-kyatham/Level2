@@ -1,6 +1,8 @@
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
-from unittest.mock import patch, MagicMock, AsyncMock
+import pytest
+
 from app.utils.async_http import async_post_json
 
 pytestmark = pytest.mark.unit

@@ -5,9 +5,10 @@ The legacy retrieval_agent is preserved for auxiliary fallback and standalone te
 """
 import logging
 import re
-from datetime import datetime, timezone
-from app.workflows.langgraph_state import AgentState
+from datetime import timezone
+
 from app.mcp_client import mcp_client
+from app.workflows.langgraph_state import AgentState
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
     expanded_query = state.get("expanded_query", "") or query
     target_category = state.get("target_category", "All")
     target_url = state.get("target_url", "")
-    
+
     # ── Live Feed intent: fetch latest real-time articles sorted by date ───
     if state.get("intent") == "live_feed":
         logger.info("Fetching latest live feed articles...")
@@ -84,8 +85,9 @@ async def retrieval_agent(state: AgentState) -> AgentState:
 
         if topic_filter:
             try:
-                from app.repositories.news_repository import news_repository
                 from datetime import datetime
+
+                from app.repositories.news_repository import news_repository
 
                 matching_arts = await news_repository.search_articles(query=topic_filter, limit=25)
                 if len(matching_arts) < 3:
@@ -197,10 +199,10 @@ async def retrieval_agent(state: AgentState) -> AgentState:
             "BBC News", "BBC Tech", "TechCrunch", "Economic Times", "NDTV News",
             "Google News", "Google Tech News", "Google Business", "TOI Tech"
         ]
-        
+
         detected_sources = []
         q_lower = query.lower()
-        
+
         if "times of india" in q_lower or "toi" in q_lower:
             detected_sources.append("Times of India")
         if "hindu" in q_lower:
@@ -215,13 +217,13 @@ async def retrieval_agent(state: AgentState) -> AgentState:
             detected_sources.append("NDTV News")
         if "economic times" in q_lower:
             detected_sources.append("Economic Times")
-            
+
         for src in known_sources:
             if src.lower() in q_lower and src not in detected_sources:
                 detected_sources.append(src)
-                
+
         detected_sources = list(dict.fromkeys(detected_sources))
-        
+
         if len(detected_sources) >= 2:
             source1, source2 = detected_sources[0], detected_sources[1]
         elif len(detected_sources) == 1:
@@ -229,35 +231,35 @@ async def retrieval_agent(state: AgentState) -> AgentState:
             source2 = "The Hindu" if source1 != "The Hindu" else "Times of India"
         else:
             source1, source2 = "Times of India", "The Hindu"
-            
+
         logger.info(f"Comparing source coverage: '{source1}' vs '{source2}'")
-        
+
         from app.repositories.news_repository import news_repository
         s1_arts = await news_repository.search_articles(source=source1, limit=10)
         s2_arts = await news_repository.search_articles(source=source2, limit=10)
-        
+
         if len(s1_arts) < 3:
             s1_arts = await news_repository.search_articles(query=source1, limit=10)
         if len(s2_arts) < 3:
             s2_arts = await news_repository.search_articles(query=source2, limit=10)
-            
+
         comparison_docs = []
         for a in s1_arts[:4]:
             doc = dict(a)
             doc["comparison_source"] = source1
             comparison_docs.append(doc)
-            
+
         for a in s2_arts[:4]:
             doc = dict(a)
             doc["comparison_source"] = source2
             comparison_docs.append(doc)
-            
+
         state["retrieved_documents"] = comparison_docs
         state["source1"] = source1
         state["source2"] = source2
         state["intent"] = "compare"
         return state
-            
+
     # Detect if user provided text directly to be summarized
     user_provided_text = ""
     lower_query = query.lower().strip()
@@ -266,12 +268,12 @@ async def retrieval_agent(state: AgentState) -> AgentState:
         if lower_query.startswith(prefix):
             user_provided_text = query[len(prefix):].strip()
             break
-            
+
     if not user_provided_text and len(query) > 150 and "summarize" in lower_query:
         parts = re.split(r'(?i)\bsummarize\b\s*(?:this|the|text|following)?(?:\s+site|\s+article|\s+info)?\s*[:,-]?\s*', query)
         if len(parts) > 1 and len(parts[1].strip()) > 50:
             user_provided_text = parts[1].strip()
-            
+
     if user_provided_text:
         logger.info("Detected user-provided text for direct summarization.")
         state["retrieved_documents"] = [{
@@ -297,7 +299,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
                         break
         except Exception as e:
             logger.error(f"Error checking resource for target URL: {e}")
-            
+
         if not found_art:
             try:
                 live_articles = await mcp_client.call_tool("search_live_news", {"query": target_url, "limit": 5})
@@ -305,7 +307,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
                     found_art = live_articles[0]
             except Exception as e:
                 logger.error(f"Error calling search_live_news for URL: {e}")
-                
+
         if found_art:
             logger.info(f"Found article matching URL: {found_art.get('title')}")
             broader_context = any(k in query.lower() for k in ["broader", "related", "context", "more", "compare", "others"])
@@ -328,7 +330,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
         # Route searches to appropriate news category (Requirement 5)
         try:
             live_articles = await mcp_client.call_tool(
-                "search_live_news", 
+                "search_live_news",
                 {"query": expanded_query, "category": target_category, "limit": 20}
             )
             if isinstance(live_articles, list):
@@ -380,28 +382,28 @@ async def retrieval_agent(state: AgentState) -> AgentState:
             logger.error(f"Fallback resource read failed: {e}")
 
     # 3. News Event Deduplication using DuplicateDetectionAgent
-    from app.agents.duplicate import DuplicateDetectionAgent
-    from datetime import datetime
-    import requests
     import time
-    
+    from datetime import datetime
+
+    from app.agents.duplicate import DuplicateDetectionAgent
+
     dup_agent = DuplicateDetectionAgent()
     query_emb = []
-    
+
     # ── OPTIMIZATION: Pre-compute ALL embeddings (query + titles + contents) in ONE batch call ──
     # Previously: titles were batched but content embeddings were fetched per-pair (~3s each × 15 pairs = ~45s)
     # Now: single batch call for everything (~5s total)
     if retrieved_docs:
         t_embed_start = time.time()
         logger.info(f"Pre-computing embeddings for query + {len(retrieved_docs)} articles (titles + contents) in single batch...")
-        
+
         # Build the batch: [query, title1, content1, title2, content2, ...]
         texts_to_embed = [expanded_query or ""]
         for art in retrieved_docs:
             texts_to_embed.append((art.get("title") or "News Update")[:500])
             content = (art.get("content") or art.get("cleaned_content") or "")[:500]
             texts_to_embed.append(content if content.strip() else "No content available")
-            
+
         try:
             from app.utils.async_http import async_post_json
             status_code, data, text = await async_post_json(
@@ -424,7 +426,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
                 logger.warning(f"Batch embedding returned status {status_code}. Falling back to lazy execution.")
         except Exception as e:
             logger.warning(f"Batch embedding failed: {e}. Falling back to lazy execution.")
-    
+
     # Deduplication loop (now uses pre-computed embeddings — no per-pair Ollama calls)
     t_dedup_start = time.time()
     unique_events = []
@@ -435,7 +437,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
             if is_dup:
                 matched_event_idx = idx
                 break
-                
+
         if matched_event_idx != -1:
             better_art = dup_agent.choose_better_article(unique_events[matched_event_idx], art)
             unique_events[matched_event_idx] = better_art
@@ -449,27 +451,27 @@ async def retrieval_agent(state: AgentState) -> AgentState:
     if not query_emb and expanded_query:
         query_emb = await embedding_agent.run(expanded_query)
     query_words = set(re.findall(r'\b\w+\b', expanded_query.lower())) if expanded_query else set()
-    
+
     for idx, art in enumerate(unique_events):
         score = 0.0
         title = (art.get("title") or "").lower()
         content = (art.get("content") or "").lower()
         text = title + " " + content
-        
+
         # 1. Query relevance (semantic and keyword)
         title_emb = art.get("title_emb")
         if title_emb is None:
             title_emb = dup_agent.get_ollama_embedding(art.get("title", ""))
             art["title_emb"] = title_emb
-        
+
         title_sim = dup_agent.cosine_similarity(query_emb, title_emb)
-        
+
         # REQUIREMENT 6: Exclude articles whose relevance score falls below threshold
         # Title similarity threshold is set to 0.35 when valid embeddings exist.
         if query_emb and title_emb and title_sim < 0.35 and not (target_url and art.get("url") == target_url):
             logger.info(f"Skipping article '{art.get('title')}' due to low semantic similarity ({title_sim:.4f})")
             continue
-            
+
         # REQUIREMENT 8: Validate topic/entity membership
         topic_lower = extracted_topic.lower()
         if extracted_topic and topic_lower not in ["technology", "business", "politics", "sports", "health", "international", "general news", "general"]:
@@ -480,7 +482,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
                     keywords_to_check.append(w)
                     if len(w) > 4:
                         keywords_to_check.append(w[:4]) # e.g. econ for economic/economy
-                        
+
             # Synonym expansion for common topic query terms
             if any(x in topic_lower for x in ["econ", "market", "finance", "business"]):
                 keywords_to_check.extend(["econ", "market", "stock", "trade", "inflation", "finance", "bank", "dollar", "fed", "revenue", "shares"])
@@ -490,45 +492,45 @@ async def retrieval_agent(state: AgentState) -> AgentState:
             for ent in state.get("extracted_entities", []):
                 keywords_to_check.append(ent.lower())
                 keywords_to_check.extend(re.findall(r'\b\w{3,}\b', ent.lower()))
-            
+
             keywords_to_check = [k for k in set(keywords_to_check) if k]
             if keywords_to_check and not any(kw in text for kw in keywords_to_check):
                 logger.info(f"Skipping article '{art.get('title')}' - unrelated to requested topic '{extracted_topic}'")
                 continue
-        
+
         # Semantic similarity weight
         score += (title_sim * 25.0)
-        
+
         # Keyword matches
         if query_words:
             matches = len(query_words.intersection(set(re.findall(r'\b\w+\b', text))))
             score += matches * 1.5
-        
+
         # 2. News importance & Global impact
         if any(k in text for k in ["global", "worldwide", "international", "world", "nationwide", "country"]):
             score += 2.0
-            
+
         # 3. Business impact
         if any(k in text for k in ["acquisition", "revenue", "billion", "shares", "stock", "deal", "merge", "investment", "buyout"]):
             score += 2.0
-            
+
         # 4. Affected users
         if any(k in text for k in ["million", "user", "affect", "subscriber", "customer", "disrupt", "outage"]):
             score += 2.0
-            
+
         # 5. Government involvement
         if any(k in text for k in ["government", "court", "regulate", "levy", "ban", "law", "antitrust", "justice", "commission", "senate", "parliament"]):
             score += 3.0
-            
+
         # 6. Cybersecurity severity
         if any(k in text for k in ["breach", "hack", "leak", "ransomware", "compromise", "vulnerability", "cyberattack"]):
             score += 3.5
-            
+
         # 7. Source authority
         src = (art.get("source") or "").lower()
         src_score = dup_agent.get_source_score(src)
         score += src_score * 2.0
-        
+
         # 8. Publication recency (freshness)
         hours_old = dup_agent.date_diff_hours(art.get("published_date"), datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
         if hours_old < 12:
@@ -537,18 +539,18 @@ async def retrieval_agent(state: AgentState) -> AgentState:
             score += 2.0
         elif hours_old < 48:
             score += 1.0
-            
+
         # 9. Confirmation vs Rumor Status (Rumors penalized)
         is_rumor = any(k in text for k in ["rumor", "reportedly", "alleged", "sources claim", "rumoured", "unconfirmed"])
         if is_rumor:
             score -= 4.0
-            
+
         # Prioritize exact URL source
         if target_url and art.get("url") == target_url:
             score += 50.0
-            
+
         ranked_events.append((score, art))
-        
+
     if not ranked_events and unique_events:
         logger.warning("All articles were filtered out by strict topic checks. Falling back to top unique retrieved articles.")
         final_unique_docs = unique_events[:5]

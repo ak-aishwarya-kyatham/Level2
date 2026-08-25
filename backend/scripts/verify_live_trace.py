@@ -1,11 +1,19 @@
 import os
 import sys
 
+# Windows cp1252 safety: configure stdout to UTF-8 if possible, else fall back silently
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 def verify_live_trace():
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     candidate_paths = [
         os.path.join(base_dir, "tests", "live_agent_trace.txt"),
-        os.path.join(os.path.dirname(base_dir), "tests", "live_agent_trace.txt")
+        os.path.join(os.path.dirname(base_dir), "tests", "live_agent_trace.txt"),
     ]
 
     trace_path = None
@@ -15,7 +23,8 @@ def verify_live_trace():
             break
 
     if not trace_path:
-        print("❌ Error: Could not locate tests/live_agent_trace.txt artifact.")
+        print("[ERROR] Could not locate tests/live_agent_trace.txt artifact.")
+        print("        Run `python scripts/run_live_trace.py` to generate it locally.")
         sys.exit(1)
 
     with open(trace_path, "r", encoding="utf-8", errors="replace") as f:
@@ -23,7 +32,7 @@ def verify_live_trace():
 
     errors = []
 
-    # 1. Assert stdio transport
+    # 1. Assert stdio transport evidence
     if "MCP TRANSPORT: stdio ClientSession (Active: True)" not in content and "MCP client session" not in content:
         errors.append("Trace lacks verified MCP stdio ClientSession connection proof.")
 
@@ -35,8 +44,12 @@ def verify_live_trace():
     if "Fallback Used: True" in content:
         errors.append("Trace indicates reflection fallback was used.")
 
-    if "Ollama circuit breaker active" in content or "Ollama fallback triggered" in content or "Ollama failed or is offline" in content:
-        errors.append("Trace was generated with LLM fallback active — does not demonstrate live model reasoning.")
+    if (
+        "Ollama circuit breaker active" in content
+        or "Ollama fallback triggered" in content
+        or "Ollama failed or is offline" in content
+    ):
+        errors.append("Trace was generated with LLM fallback active - does not demonstrate live model reasoning.")
 
     # 4. Assert policy decisions and reflection verdicts exist
     if "POLICY DECISION:" not in content:
@@ -46,14 +59,17 @@ def verify_live_trace():
         errors.append("Trace lacks ReflectionAgent validation entries.")
 
     if errors:
-        print("⚠️ [TRACE VERIFICATION FAILED]:")
+        print("[TRACE VERIFICATION FAILED]:")
         for err in errors:
             print(f"  - {err}")
-        print("\nRe-run `python scripts/run_live_trace.py` with active MCP session & Ollama qwen2.5:3b.")
+        print()
+        print("Re-run `python scripts/run_live_trace.py` with active MCP session & Ollama qwen2.5:3b.")
         sys.exit(1)
     else:
-        print("✅ [TRACE VERIFIED]: Trace confirms genuine MCP stdio session, dynamic tool discovery, LLM policy execution, and reflection validation.")
+        print("[TRACE VERIFIED]: Trace confirms genuine MCP stdio session, dynamic tool discovery,")
+        print("                  LLM policy execution, and reflection validation.")
         sys.exit(0)
+
 
 if __name__ == "__main__":
     verify_live_trace()

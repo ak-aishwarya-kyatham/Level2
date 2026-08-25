@@ -1,8 +1,10 @@
-import os
 import json
+import os
 import time
 from datetime import datetime, timezone
+
 from fastapi import APIRouter
+
 from app.mcp_client import mcp_client
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
@@ -21,8 +23,8 @@ async def get_analytics_metrics():
 @router.post("/evaluate")
 async def run_evaluation_benchmark():
     """Triggers an actual dynamic evaluation run against live indexed news articles and records execution metrics."""
-    from app.utils.evaluator import run_routing_benchmark, evaluate_execution
     from app.repositories.news_repository import news_repository
+    from app.utils.evaluator import evaluate_execution, run_routing_benchmark
     from app.workflows.main_workflow import _synthesize_from_observations
 
     # Load eval dataset if available
@@ -69,7 +71,7 @@ async def run_evaluation_benchmark():
         latency=t_elapsed,
         cache_hit=False
     )
-    
+
     # 4. Use honest routing accuracy from policy agent benchmark (no flooring/clamping)
     eval_res["routing_accuracy"] = routing_res.get("routing_accuracy", 0.0)
 

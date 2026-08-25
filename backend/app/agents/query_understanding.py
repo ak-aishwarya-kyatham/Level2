@@ -1,6 +1,6 @@
-import re
 import logging
-from typing import List, Dict, Any, Tuple
+import re
+
 from app.workflows.langgraph_state import AgentState
 
 logger = logging.getLogger(__name__)
@@ -79,33 +79,33 @@ def extract_url(query: str) -> str:
 def query_understanding_agent(state: AgentState) -> AgentState:
     logger.info("Query Understanding Agent analyzing search query...")
     query = state.get("query", "").strip()
-    
+
     # 1. URL extraction
     target_url = extract_url(query)
     state["target_url"] = target_url
-    
+
     # 2. Topic extraction (Rule-based first)
     extracted_topic = ""
     clean_query = query
     if target_url:
         clean_query = query.replace(target_url, "").strip()
-        
+
     for pattern in TOPIC_PATTERNS:
         match = re.search(pattern, clean_query)
         if match:
             extracted_topic = match.group(1).strip("?:., ")
             break
-            
+
     if not extracted_topic:
         extracted_topic = clean_query.strip("?:., ")
-        
+
     # 3. Named Entity Recognition (NER) & Abbreviations Expansion
     entities = []
     expanded_terms = []
     inferred_category = "General News"
-    
+
     words = re.findall(r'\b\w+\b', clean_query.lower())
-    
+
     # Check abbreviations
     for word in words:
         if word in ABBREVIATIONS:
@@ -114,15 +114,15 @@ def query_understanding_agent(state: AgentState) -> AgentState:
             expanded_terms.append(info["full_name"])
             expanded_terms.extend(info["related"])
             inferred_category = info["category"]
-            
+
     # NER for capitalized words (excluding common query terms)
     capitalized_words = re.findall(r'\b[A-Z][a-zA-Z]+\b', clean_query)
     for word in capitalized_words:
         if word.lower() not in ["the", "latest", "what", "news", "summarize", "today", "show", "search"]:
             entities.append(word)
-            
+
     entities = list(set(entities))
-    
+
     # 4. Route news category
     if inferred_category == "General News":
         max_matches = 0
@@ -131,13 +131,13 @@ def query_understanding_agent(state: AgentState) -> AgentState:
             if matches > max_matches:
                 max_matches = matches
                 inferred_category = cat
-                
+
     # 5. Build expanded query
     expanded_parts = [clean_query]
     if expanded_terms:
         expanded_parts.extend(expanded_terms)
     expanded_query = " ".join(list(set(expanded_parts)))
-    
+
     # Normalize extracted topic (handle examples specifically)
     topic_lower = extracted_topic.lower()
     topic_words = set(re.findall(r'\b\w+\b', topic_lower))
@@ -145,21 +145,21 @@ def query_understanding_agent(state: AgentState) -> AgentState:
         if word in topic_words:
             extracted_topic = info["full_name"]
             break
-            
+
     if "tech" in topic_lower:
         extracted_topic = "Technology"
         inferred_category = "Technology"
-        
+
     state["extracted_topic"] = extracted_topic
     state["extracted_entities"] = entities
     state["expanded_query"] = expanded_query
     state["target_category"] = inferred_category
-    
+
     logger.info(f"Query Analysis Complete:\n"
                 f"  Extracted Topic: {extracted_topic}\n"
                 f"  Entities: {entities}\n"
                 f"  Expanded Query: {expanded_query}\n"
                 f"  Category: {inferred_category}\n"
                 f"  Target URL: {target_url}")
-                
+
     return state

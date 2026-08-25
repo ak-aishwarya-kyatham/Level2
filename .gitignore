@@ -51,6 +51,12 @@ FRESH_TEST_RUN.txt
 test_output.txt
 *.tmp
 
+# Live agent trace files (locally generated - must be fresh-run, never committed stale)
+# To regenerate: python backend/scripts/run_live_trace.py
+backend/tests/live_agent_trace.txt
+backend/tests/simulated_integration_trace.txt
+tests/live_agent_trace.txt
+
 # Review Reports & Course Material (Keep repository clean of review notes)
 docs/reviews/
 docs/reviews/*

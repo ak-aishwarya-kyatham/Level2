@@ -1,8 +1,10 @@
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from app.main import app, lifespan, periodic_news_fetcher
 from app.utils.task_lifecycle import BackgroundTaskManager
-from app.main import lifespan, app, periodic_news_fetcher
 
 pytestmark = pytest.mark.unit
 

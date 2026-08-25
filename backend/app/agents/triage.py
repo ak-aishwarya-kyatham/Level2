@@ -1,9 +1,11 @@
 import logging
+
 from app.workflows.langgraph_state import AgentState
 
 logger = logging.getLogger(__name__)
 
 import re
+
 
 def triage_agent(state: AgentState) -> AgentState:
     """
@@ -11,16 +13,16 @@ def triage_agent(state: AgentState) -> AgentState:
     """
     logger.info("Triage Agent analyzing intent...")
     query = state.get("query", "").lower().strip()
-    
+
     # Strip UI greeting/prefill artifacts (e.g. ", or compare news sources! what is...")
     query = re.sub(r"^(?:,\s*or\s+compare\s+news\s+sources[!.]*|ask\s+me\s+to\s+summarize\s+recent\s+news[,\s]*|search\s+specific\s+topics[,\s]*|analyze\s+trends[,\s]*)+", "", query, flags=re.IGNORECASE).strip()
-    
+
     # Extract requested number of items if specified (e.g. "top 1", "top 3", "give me 1", "give me one", "1 topic", "only 2")
     number_words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
-    
+
     limit_match = re.search(r'\b(?:top|first|only|limit|give me|show me|get|just)\s*(\d+)\b', query) or \
                   re.search(r'\b(\d+)\s*(?:items?|feeds?|articles?|topics?|news)?\b', query)
-    
+
     if limit_match and limit_match.group(1):
         try:
             state["requested_limit"] = int(limit_match.group(1))
@@ -53,7 +55,7 @@ def triage_agent(state: AgentState) -> AgentState:
         state["intent"] = "live_feed"
     else:
         state["intent"] = "search"
-        
+
     logger.info(f"Intent determined as: {state['intent']} (requested_limit={state.get('requested_limit')})")
     return state
 

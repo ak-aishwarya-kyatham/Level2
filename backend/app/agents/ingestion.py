@@ -1,10 +1,12 @@
 import asyncio
 import logging
-import feedparser
 import urllib.parse
-from typing import List, Tuple
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from typing import List, Tuple
+
+import feedparser
+
 from app.schemas.news import NewsArticleBase
 
 logger = logging.getLogger(__name__)
