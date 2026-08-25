@@ -64,3 +64,5 @@ docs/*review*.md
 *REVIEW_REPORT*.md
 docs/l2.md
 AGENTS.md
+backend/app/data/agent_execution_logs.json
+backend/app/data/agent_execution_logs.json

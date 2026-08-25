@@ -681,7 +681,7 @@ def synthesize_comparison_briefing(query: str, docs: list, source1: str = None, 
         s2_docs = docs[len(docs) // 2:]
 
     # ── Find shared stories (same topic, different outlet angle) ──────────────
-    OVERLAP_THRESHOLD = 0.28
+    overlap_threshold = 0.28
     shared_stories = []   # list of (s1_doc, s2_doc, score)
     used_s1 = set()
     used_s2 = set()
@@ -696,7 +696,7 @@ def synthesize_comparison_briefing(query: str, docs: list, source1: str = None, 
             )
             if score > best_score:
                 best_score, best_j = score, j
-        if best_score >= OVERLAP_THRESHOLD and best_j >= 0:
+        if best_score >= overlap_threshold and best_j >= 0:
             shared_stories.append((i, best_j, best_score))
             used_s1.add(i)
             used_s2.add(best_j)

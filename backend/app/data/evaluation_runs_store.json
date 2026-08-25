@@ -1633,5 +1633,131 @@
       "cache_hit": false,
       "cache_hit_rate": 0.0
     }
+  },
+  {
+    "run_id": "run_1787645984944",
+    "timestamp": "2026-08-25T08:19:44.944823+00:00",
+    "query": "Tell me more about \"Nuzivid veena maker Sheik Mabu, presents veena to Vice-President\" and summarize its implications.",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [],
+    "test_cases": [],
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.23,
+      "groundedness": 0.23,
+      "answer_relevance": 1.0,
+      "categorization_f1": 1.0,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 22.0465,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787646007683",
+    "timestamp": "2026-08-25T08:20:07.683711+00:00",
+    "query": "What are the global economic updates?",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [],
+    "test_cases": [],
+    "metrics": {
+      "precision_at_5": 1.0,
+      "mrr_at_10": 1.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.78,
+      "groundedness": 0.59,
+      "answer_relevance": 1.0,
+      "categorization_f1": 1.0,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 14.203,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787646026470",
+    "timestamp": "2026-08-25T08:20:26.470957+00:00",
+    "query": "Summarize top tech news today",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [],
+    "test_cases": [],
+    "metrics": {
+      "precision_at_5": 1.0,
+      "mrr_at_10": 1.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.78,
+      "groundedness": 0.69,
+      "answer_relevance": 1.0,
+      "categorization_f1": 1.0,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 14.9272,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787646075316",
+    "timestamp": "2026-08-25T08:21:15.316641+00:00",
+    "query": "Compare Times of India vs The Hindu coverage",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [],
+    "test_cases": [],
+    "metrics": {
+      "precision_at_5": 1.0,
+      "mrr_at_10": 1.0,
+      "routing_accuracy": 0.0,
+      "faithfulness": 0.74,
+      "groundedness": 0.58,
+      "answer_relevance": 0.62,
+      "categorization_f1": 1.0,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 23.4664,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787646101672",
+    "timestamp": "2026-08-25T08:21:41.672379+00:00",
+    "query": "Latest artificial intelligence innovations",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [],
+    "test_cases": [],
+    "metrics": {
+      "precision_at_5": 1.0,
+      "mrr_at_10": 1.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.8,
+      "groundedness": 0.69,
+      "answer_relevance": 1.0,
+      "categorization_f1": 1.0,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 16.1601,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
+  },
+  {
+    "run_id": "run_1787646163557",
+    "timestamp": "2026-08-25T08:22:43.557556+00:00",
+    "query": "Tell me more about \"CPI-CPI(M) battle over Keralam Dy LoP post intensifies as Sathyan Mokeri lambasts Opposition Leader Pinarayi Vijayan\" and summarize its implications.",
+    "model_name": "qwen2.5:3b",
+    "tool_calls": [],
+    "test_cases": [],
+    "metrics": {
+      "precision_at_5": 0.0,
+      "mrr_at_10": 0.0,
+      "routing_accuracy": 1.0,
+      "faithfulness": 0.3,
+      "groundedness": 0.3,
+      "answer_relevance": 1.0,
+      "categorization_f1": 1.0,
+      "deduplication_recall": 1.0,
+      "latency_seconds": 12.9799,
+      "cache_hit": false,
+      "cache_hit_rate": 0.0
+    }
   }
 ]

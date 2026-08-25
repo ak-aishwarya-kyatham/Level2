@@ -1,10 +1,9 @@
 import logging
+import re
 
 from app.workflows.langgraph_state import AgentState
 
 logger = logging.getLogger(__name__)
-
-import re
 
 
 def triage_agent(state: AgentState) -> AgentState:

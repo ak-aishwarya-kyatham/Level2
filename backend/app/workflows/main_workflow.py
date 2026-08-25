@@ -95,16 +95,16 @@ async def policy_node(state: AgentState) -> AgentState:
     if state.get("iteration_count") is None:
         state["iteration_count"] = 0
 
-    MAX_ITERATIONS = 5
+    max_iterations = 5
 
     # Max iteration safety check — only fires to prevent infinite loops.
     # Normal termination must come from the Policy Agent via {"action": "finish"}.
-    if state["iteration_count"] >= MAX_ITERATIONS:
-        logger.warning(f"[Workflow] Max iterations ({MAX_ITERATIONS}) reached. Synthesizing from observations.")
+    if state["iteration_count"] >= max_iterations:
+        logger.warning(f"[Workflow] Max iterations ({max_iterations}) reached. Synthesizing from observations.")
         state["next_action"] = "finish"
         synth = _synthesize_from_observations(state["query"], state["observations"])
         state["action_answer"] = synth or "Could not retrieve sufficient information."
-        state["action_thought"] = f"Reached MAX_ITERATIONS={MAX_ITERATIONS}. Synthesizing from collected data."
+        state["action_thought"] = f"Reached max_iterations={max_iterations}. Synthesizing from collected data."
         return state
 
     query = state["query"]
@@ -325,8 +325,10 @@ def _synthesize_from_observations(query: str, observations: list, intent: str = 
         elif isinstance(result, dict):
             s1 = result.get("source1")
             s2 = result.get("source2")
-            if s1: source1_val = s1
-            if s2: source2_val = s2
+            if s1:
+                source1_val = s1
+            if s2:
+                source2_val = s2
 
             # Handle compare_news_sources dict
             for item in result.get("common_news", []):

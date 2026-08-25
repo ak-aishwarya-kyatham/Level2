@@ -7,10 +7,15 @@ import logging
 import re
 from datetime import timezone
 
+from app.agents.embedding import EmbeddingAgent
+from app.database.qdrant import qdrant_manager
 from app.mcp_client import mcp_client
 from app.workflows.langgraph_state import AgentState
 
 logger = logging.getLogger(__name__)
+
+# Module-level embedding agent for vector search (lazy-loads model on first use)
+_embedding_agent = EmbeddingAgent()
 
 def search_agent(state: AgentState) -> AgentState:
     """Deprecated stub: Replaced by MCP tool_node."""
@@ -350,7 +355,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
         # Also query Qdrant vector index if active
         if qdrant_manager.client:
             try:
-                query_vector = await embedding_agent.run(expanded_query)
+                query_vector = await _embedding_agent.run(expanded_query)
                 qdrant_results = qdrant_manager.search(query_vector=query_vector, top_k=8)
                 for result in qdrant_results:
                     payload = result.payload or {}
@@ -449,7 +454,7 @@ async def retrieval_agent(state: AgentState) -> AgentState:
     # 4. Improved Weighted Relevance Ranking & Relevance Thresholding
     ranked_events = []
     if not query_emb and expanded_query:
-        query_emb = await embedding_agent.run(expanded_query)
+        query_emb = await _embedding_agent.run(expanded_query)
     query_words = set(re.findall(r'\b\w+\b', expanded_query.lower())) if expanded_query else set()
 
     for idx, art in enumerate(unique_events):

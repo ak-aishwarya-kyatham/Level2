@@ -121,9 +121,8 @@ class ReflectionAgent:
                 fallback_used=True,
             )
 
-        obs_tokens  = self._extract_observation_tokens(history, query=query)
-        source_urls = self._extract_source_urls(history)
-        sentences   = self._extract_answer_sentences(answer)
+        obs_tokens = self._extract_observation_tokens(history, query=query)
+        sentences  = self._extract_answer_sentences(answer)
 
         if not sentences:
             logger.warning("[Reflection Fallback] Answer has no verifiable sentences. Marking UNVERIFIED (revise=False — no claims to revise).")
@@ -150,8 +149,8 @@ class ReflectionAgent:
         supported   : List[str] = []
         unsupported : List[str] = []
 
-        GROUND_THRESHOLD  = 0.25   # ≥ 25 % match with corpus/query tokens → grounded
-        SUSPECT_THRESHOLD = 0.10   # < 10 % match → flagged unsupported
+        ground_threshold  = 0.25   # >= 25 % match with corpus/query tokens -> grounded
+        suspect_threshold = 0.10   # <  10 % match -> flagged unsupported
 
         for sentence in sentences:
             s_lower = sentence.lower().strip()
@@ -170,9 +169,9 @@ class ReflectionAgent:
             matched = sum(1 for w in words if w in obs_tokens)
             ratio   = matched / len(words)
 
-            if ratio >= GROUND_THRESHOLD or any(w in s_lower for w in ["reported", "according", "session", "bills", "parliament", "legislative"]):
+            if ratio >= ground_threshold or any(w in s_lower for w in ["reported", "according", "session", "bills", "parliament", "legislative"]):
                 supported.append(sentence)
-            elif ratio < SUSPECT_THRESHOLD:
+            elif ratio < suspect_threshold:
                 unsupported.append(sentence)
             else:
                 supported.append(sentence)
@@ -300,7 +299,8 @@ class ReflectionAgent:
                         for item in val[:5]:
                             if isinstance(item, dict):
                                 t = item.get("title") or item.get("source1_title") or ""
-                                if t: items_str.append(f"- {t}")
+                                if t:
+                                    items_str.append(f"- {t}")
                 if not items_str:
                     items_str.append(str(res)[:400])
                 observations_str += (
@@ -332,12 +332,12 @@ class ReflectionAgent:
 
         prompt = (
             f"User Query: {query}\n\n"
-            f"Observations:\n{observations_str}\n"
-            f"Generated Answer:\n{answer}\n\n"
+            f"Observations:\n{observations_str[:2000]}\n"
+            f"Generated Answer:\n{answer[:1200]}\n\n"
             "JSON Reflection Report:"
         )
 
-        ollama_timeout = float(os.getenv("OLLAMA_TIMEOUT", "4.0"))
+        ollama_timeout = float(os.getenv("OLLAMA_TIMEOUT", "15.0"))
         logger.info(f"[Reflection Agent] Analyzing generated response for hallucinations (Model: '{self.model_name}', Timeout: {ollama_timeout}s)...")
         fallback_reason = "Unknown Ollama error"
         try:
@@ -350,7 +350,7 @@ class ReflectionAgent:
                     "stream": False,
                     "format": "json",
                     "options": {
-                        "num_predict": 150,
+                        "num_predict": 500,
                         "temperature": 0.0
                     }
                 },

@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+from typing import List, Tuple
 
 import requests
 
@@ -12,11 +13,10 @@ from app.agents.reflection_agent import ReflectionAgent
 from app.mcp_client import mcp_client
 from app.workflows.main_workflow import _synthesize_from_observations
 
+os.environ["OLLAMA_TIMEOUT"] = os.getenv("OLLAMA_TIMEOUT", "60.0")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 
-
-from typing import List, Tuple
 
 
 def check_ollama_status() -> Tuple[bool, bool, List[str]]:

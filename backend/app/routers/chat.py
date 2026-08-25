@@ -3,7 +3,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from app.workflows.langgraph_state import AgentState
 from app.workflows.main_workflow import app_graph
@@ -11,8 +11,6 @@ from app.workflows.main_workflow import app_graph
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
-
-from pydantic import model_validator
 
 
 class ChatRequest(BaseModel):

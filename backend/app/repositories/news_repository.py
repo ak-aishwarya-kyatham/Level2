@@ -659,10 +659,10 @@ class NewsRepository:
 
         agent_performance = []
         for agent_name in agent_names:
-            logs = [l for l in self.agent_execution_logs if l.get("agent") == agent_name]
+            logs = [log_entry for log_entry in self.agent_execution_logs if log_entry.get("agent") == agent_name]
             if logs:
-                avg_lat = round(sum(l["latency_ms"] for l in logs) / len(logs), 1)
-                succ_rate = round((sum(1 for l in logs if l.get("success")) / len(logs)) * 100, 1)
+                avg_lat = round(sum(log_entry["latency_ms"] for log_entry in logs) / len(logs), 1)
+                succ_rate = round((sum(1 for log_entry in logs if log_entry.get("success")) / len(logs)) * 100, 1)
                 agent_performance.append({
                     "agent": agent_name,
                     "avg_latency_ms": avg_lat,
@@ -702,9 +702,6 @@ class NewsRepository:
         ]
 
         # Dynamic System Evaluation Benchmark Suite derived from evaluator.py runs
-        from app.utils.redis_cache import get_cache_hit_rate
-        live_cache_hit_rate = get_cache_hit_rate()
-
         metrics_specs = [
             {
                 "name": "Precision@5",

@@ -339,7 +339,7 @@ class PolicyAgent:
             "JSON Action:"
         )
 
-        ollama_timeout = float(os.getenv("OLLAMA_TIMEOUT", "4.0"))
+        ollama_timeout = float(os.getenv("OLLAMA_TIMEOUT", "15.0"))
         logger.info(f"[Policy Agent] Querying LLM on iteration {iteration_count} (Model: '{self.model_name}', Timeout: {ollama_timeout}s)...")
         fallback_reason = "Unknown Ollama error"
         try:
@@ -352,7 +352,7 @@ class PolicyAgent:
                     "stream": False,
                     "format": "json",
                     "options": {
-                        "num_predict": 100,
+                        "num_predict": 250,
                         "temperature": 0.0
                     }
                 },
