@@ -39,8 +39,6 @@ backend/app/data/*.json
 Thumbs.db
 .gemini/
 
-# GitHub Workflows & Actions (No workflow directory)
-.github/
 
 # Temporary / Scratch / Debug Directories & Scripts
 backend/scratch/
@@ -51,11 +49,8 @@ FRESH_TEST_RUN.txt
 test_output.txt
 *.tmp
 
-# Live agent trace files (locally generated - must be fresh-run, never committed stale)
-# To regenerate: python backend/scripts/run_live_trace.py
-backend/tests/live_agent_trace.txt
+# Temporary / Scratch Trace Artifacts
 backend/tests/simulated_integration_trace.txt
-tests/live_agent_trace.txt
 
 # Review Reports & Course Material (Keep repository clean of review notes)
 docs/reviews/

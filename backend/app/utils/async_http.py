@@ -53,3 +53,44 @@ async def async_post_json(url: str, payload: dict, timeout: float) -> Tuple[int,
     except Exception as exc:
         logger.error(f"Async HTTP error calling {url}: {exc}")
         raise exc
+
+
+async def async_get_json(url: str, timeout: float) -> Tuple[int, Dict[str, Any], str]:
+    """
+    Asynchronously executes an HTTP GET request using httpx.AsyncClient.
+    Preserves timeouts, status codes, and JSON parsing without blocking the event loop.
+    """
+    if _is_requests_mocked():
+        try:
+            r = requests.get(url, timeout=timeout)
+            status_code = r.status_code
+            text = r.text
+            data = {}
+            if status_code == 200:
+                try:
+                    data = r.json()
+                except Exception:
+                    pass
+            return status_code, data, text
+        except Exception as exc:
+            raise exc
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(url)
+            status_code = resp.status_code
+            text = resp.text
+            data = {}
+            if status_code == 200:
+                try:
+                    data = resp.json()
+                except Exception as json_err:
+                    logger.warning(f"Async HTTP GET JSON parse error: {json_err}")
+            return status_code, data, text
+    except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectTimeout) as t_err:
+        logger.warning(f"Async HTTP GET timeout calling {url}: {t_err}")
+        raise t_err
+    except Exception as exc:
+        logger.error(f"Async HTTP GET error calling {url}: {exc}")
+        raise exc
+
